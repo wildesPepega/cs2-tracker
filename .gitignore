@@ -1,4 +1,6 @@
 /target
+/dist
 .env
 state.json
 state.json.tmp
+.cs2-tracker.update

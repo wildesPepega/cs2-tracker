@@ -61,7 +61,7 @@ impl Store {
         let mut state = self.state.lock().await;
         let out = f(&mut state);
         if let Err(e) = self.save(&state) {
-            tracing::error!("State konnte nicht gespeichert werden: {e:#}");
+            tracing::error!("Failed to save state: {e:#}");
         }
         out
     }

@@ -7,7 +7,7 @@
     "exported_at": "2026-10-27T00:00:00+00:00",
     "name": "CS2 Tracker",
     "author": "wildesPepega@users.noreply.github.com",
-    "description": "Discord-Bot, der Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) per Steam PICS auf Changelists und Updates überwacht und zusätzlich CS2-Blogposts sowie Twitter-Banner-Änderungen von @CounterStrike postet.",
+    "description": "Discord bot that watches Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) via Steam PICS for changelists, builds and depot changes, and posts CS2 blog posts and @CounterStrike Twitter banner changes. Updates itself automatically.",
     "features": null,
     "docker_images": {
         "Debian": "ghcr.io/parkervcp/yolks:debian"
@@ -16,13 +16,13 @@
     "startup": "./cs2-tracker",
     "config": {
         "files": "{}",
-        "startup": "{\"done\": \"Mit Steam verbunden\"}",
+        "startup": "{\"done\": \"Connected to Steam\"}",
         "logs": "{}",
         "stop": "^C"
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/bash\n# CS2 Tracker - Installationsskript\n# Lädt das passende vorgebaute Release-Binary von GitHub herunter.\nset -euo pipefail\n\nREPO=\"wildesPepega/cs2-tracker\"\n\ncase \"$(uname -m)\" in\n    x86_64|amd64)  ARCH=\"x86_64\" ;;\n    aarch64|arm64) ARCH=\"aarch64\" ;;\n    *) echo \"Nicht unterstützte Architektur: $(uname -m)\"; exit 1 ;;\nesac\n\nif [ -z \"${VERSION:-}\" ] || [ \"${VERSION}\" = \"latest\" ]; then\n    URL=\"https://github.com/${REPO}/releases/latest/download/cs2-tracker-linux-${ARCH}\"\nelse\n    URL=\"https://github.com/${REPO}/releases/download/${VERSION}/cs2-tracker-linux-${ARCH}\"\nfi\n\nmkdir -p /mnt/server\ncd /mnt/server\n\necho \"Lade ${URL}\"\ncurl -fsSL -o cs2-tracker.new \"${URL}\"\nchmod +x cs2-tracker.new\nmv cs2-tracker.new cs2-tracker\n\n# state.json bleibt bei Neuinstallationen erhalten, damit nichts doppelt gepostet wird.\necho \"Installation abgeschlossen.\"\n",
+            "script": "#!/bin/bash\n# CS2 Tracker install script\n# Downloads the matching prebuilt release binary from GitHub.\nset -euo pipefail\n\nREPO=\"wildesPepega/cs2-tracker\"\n\ncase \"$(uname -m)\" in\n    x86_64|amd64)  ARCH=\"x86_64\" ;;\n    aarch64|arm64) ARCH=\"aarch64\" ;;\n    *) echo \"Unsupported architecture: $(uname -m)\"; exit 1 ;;\nesac\n\nif [ -z \"${VERSION:-}\" ] || [ \"${VERSION}\" = \"latest\" ]; then\n    URL=\"https://github.com/${REPO}/releases/latest/download/cs2-tracker-linux-${ARCH}\"\nelse\n    URL=\"https://github.com/${REPO}/releases/download/${VERSION}/cs2-tracker-linux-${ARCH}\"\nfi\n\nmkdir -p /mnt/server\ncd /mnt/server\n\necho \"Downloading ${URL}\"\ncurl -fsSL -o cs2-tracker.new \"${URL}\"\nchmod +x cs2-tracker.new\nmv cs2-tracker.new cs2-tracker\n\n# state.json is kept on reinstall so nothing gets posted twice.\necho \"Installation complete.\"\n",
             "container": "ghcr.io/pterodactyl/installers:debian",
             "entrypoint": "bash"
         }
@@ -30,7 +30,7 @@
     "variables": [
         {
             "name": "Discord Bot Token",
-            "description": "Token des Bots aus dem Discord Developer Portal.",
+            "description": "Bot token from the Discord Developer Portal.",
             "env_variable": "DISCORD_TOKEN",
             "default_value": "",
             "user_viewable": true,
@@ -40,7 +40,7 @@
         },
         {
             "name": "Discord Channel ID",
-            "description": "ID des Channels, in den gepostet wird.",
+            "description": "ID of the channel the bot posts into.",
             "env_variable": "DISCORD_CHANNEL_ID",
             "default_value": "",
             "user_viewable": true,
@@ -49,8 +49,8 @@
             "field_type": "text"
         },
         {
-            "name": "Ping-Rolle (optional)",
-            "description": "Rollen-ID, die bei neuen public CS2-Builds gepingt wird. Leer lassen für keinen Ping.",
+            "name": "Ping Role (optional)",
+            "description": "Role ID pinged when a new public CS2 build goes live. Leave empty for no ping.",
             "env_variable": "PING_ROLE_ID",
             "default_value": "",
             "user_viewable": true,
@@ -59,8 +59,8 @@
             "field_type": "text"
         },
         {
-            "name": "PICS-Intervall (ms)",
-            "description": "Wie oft Steam auf neue Changelists geprüft wird.",
+            "name": "PICS Interval (ms)",
+            "description": "How often Steam is polled for new changelists.",
             "env_variable": "PICS_INTERVAL_MS",
             "default_value": "2000",
             "user_viewable": true,
@@ -69,8 +69,8 @@
             "field_type": "text"
         },
         {
-            "name": "News-Intervall (s)",
-            "description": "Wie oft die Steam News API auf neue CS2-Posts geprüft wird.",
+            "name": "News Interval (s)",
+            "description": "How often the Steam News API is polled for new CS2 posts.",
             "env_variable": "NEWS_INTERVAL_SECS",
             "default_value": "20",
             "user_viewable": true,
@@ -79,8 +79,8 @@
             "field_type": "text"
         },
         {
-            "name": "Twitter-Intervall (s)",
-            "description": "Wie oft der Twitter-Banner geprüft wird.",
+            "name": "Twitter Interval (s)",
+            "description": "How often the Twitter banner is checked.",
             "env_variable": "TWITTER_INTERVAL_SECS",
             "default_value": "60",
             "user_viewable": true,
@@ -89,8 +89,8 @@
             "field_type": "text"
         },
         {
-            "name": "Twitter-Handle",
-            "description": "X/Twitter-Account, dessen Banner überwacht wird.",
+            "name": "Twitter Handle",
+            "description": "X/Twitter account whose banner is watched.",
             "env_variable": "TWITTER_HANDLE",
             "default_value": "CounterStrike",
             "user_viewable": true,
@@ -99,8 +99,48 @@
             "field_type": "text"
         },
         {
+            "name": "Status Interval (s)",
+            "description": "How often the bot's CS-themed status rotates.",
+            "env_variable": "STATUS_INTERVAL_SECS",
+            "default_value": "60",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:15|max:3600",
+            "field_type": "text"
+        },
+        {
+            "name": "Presence Platform",
+            "description": "Platform icon next to the online status: vr, mobile or desktop.",
+            "env_variable": "PRESENCE_PLATFORM",
+            "default_value": "vr",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:vr,mobile,desktop",
+            "field_type": "text"
+        },
+        {
+            "name": "Auto Update",
+            "description": "Install new releases automatically and restart in place.",
+            "env_variable": "AUTO_UPDATE",
+            "default_value": "true",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:true,false",
+            "field_type": "text"
+        },
+        {
+            "name": "Update Interval (min)",
+            "description": "How often to check GitHub for a new release.",
+            "env_variable": "UPDATE_INTERVAL_MINS",
+            "default_value": "10",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1|max:1440",
+            "field_type": "text"
+        },
+        {
             "name": "Version",
-            "description": "Release-Tag (z. B. v0.1.0) oder 'latest'. Nach Änderung den Server neu installieren.",
+            "description": "Release tag to install (e.g. v0.3.0) or 'latest'. Reinstall the server after changing it.",
             "env_variable": "VERSION",
             "default_value": "latest",
             "user_viewable": true,

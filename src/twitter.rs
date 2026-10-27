@@ -2,14 +2,14 @@
 
 use crate::{
     Ctx,
-    discord::{CS2_ICON, base_embed, timestamp},
+    discord::{CS2_ICON, base_embed, image, timestamp},
 };
 use anyhow::Result;
 use serde::Deserialize;
-use serenity::all::{CreateEmbedAuthor, CreateEmbedFooter};
 use std::sync::Arc;
 use tokio::time::{MissedTickBehavior, interval};
 use tracing::{debug, info, warn};
+use twilight_util::builder::embed::{EmbedAuthorBuilder, EmbedFooterBuilder};
 
 #[derive(Deserialize)]
 struct Response {
@@ -29,7 +29,7 @@ pub async fn run(ctx: Arc<Ctx>) {
     loop {
         tick.tick().await;
         if let Err(e) = check(&ctx).await {
-            warn!("Twitter-Check fehlgeschlagen: {e:#}");
+            warn!("Twitter check failed: {e:#}");
         }
     }
 }
@@ -45,7 +45,7 @@ async fn check(ctx: &Ctx) -> Result<()> {
         .await?;
     // FxTwitter sporadically answers 404 for existing users; just retry next tick.
     let Some(user) = resp.user.filter(|_| resp.code == 200) else {
-        debug!("FxTwitter lieferte Code {}", resp.code);
+        debug!("FxTwitter returned code {}", resp.code);
         return Ok(());
     };
     let Some(banner) = user.banner_url else {
@@ -54,20 +54,22 @@ async fn check(ctx: &Ctx) -> Result<()> {
 
     let old = ctx.store.read(|s| s.twitter_banner.clone()).await;
     match old {
-        None => info!("Twitter-Banner als Basis gespeichert: {banner}"),
+        None => info!("Stored Twitter banner as baseline: {banner}"),
         Some(old) if old != banner => {
-            info!("Neuer Twitter-Banner: {banner}");
+            info!("New Twitter banner: {banner}");
             let mut embed = base_embed()
-                .author(CreateEmbedAuthor::new(format!("@{handle} auf X")).icon_url(CS2_ICON))
-                .title("🖼️ Neuer Twitter-Banner!")
+                .author(
+                    EmbedAuthorBuilder::new(format!("@{handle} on X")).icon_url(image(CS2_ICON)),
+                )
+                .title("🖼️ New Twitter banner!")
                 .url(format!("https://x.com/{handle}"))
                 .description(format!(
-                    "[@{handle}](https://x.com/{handle}) hat den Profil-Banner geändert.\n[Alter Banner]({old}/1500x500)"
+                    "[@{handle}](https://x.com/{handle}) changed their profile banner.\n[Previous banner]({old}/1500x500)"
                 ))
-                .image(format!("{banner}/1500x500"))
-                .footer(CreateEmbedFooter::new("X / Twitter"));
+                .image(image(format!("{banner}/1500x500")))
+                .footer(EmbedFooterBuilder::new("X / Twitter"));
             if let Some(avatar) = user.avatar_url {
-                embed = embed.thumbnail(avatar.replace("_normal.", "_400x400."));
+                embed = embed.thumbnail(image(avatar.replace("_normal.", "_400x400.")));
             }
             // Banner URLs end in the upload's unix timestamp.
             if let Some(t) = banner.rsplit('/').next().and_then(|t| t.parse().ok()) {

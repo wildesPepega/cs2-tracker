@@ -1,8 +1,8 @@
 //! Depot tracking: added, removed and changed depots (new manifests per branch).
 
-use crate::discord::{CS2_ICON, CS2_IMAGE, base_embed, truncate};
-use serenity::all::{CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter};
+use crate::discord::{CS2_ICON, CS2_IMAGE, base_embed, image, truncate};
 use std::collections::{BTreeMap, BTreeSet};
+use twilight_util::builder::embed::{EmbedAuthorBuilder, EmbedBuilder, EmbedFooterBuilder};
 
 type Info = BTreeMap<String, String>;
 /// depot id -> (key below `depots/<id>/` -> value)
@@ -134,7 +134,7 @@ pub fn depot_embed(
     change_number: u32,
     changes: &DepotChanges,
     new: &Info,
-) -> CreateEmbed {
+) -> EmbedBuilder {
     let mut sections = Vec::new();
 
     if !changes.added.is_empty() {
@@ -144,7 +144,7 @@ pub fn depot_embed(
             .map(|id| format!("{} {}", depot_link(id), describe(id, new)))
             .collect();
         sections.push(format!(
-            "**🆕 Neue Depots ({})**\n{}",
+            "**🆕 New depots ({})**\n{}",
             changes.added.len(),
             lines.join("\n")
         ));
@@ -152,7 +152,7 @@ pub fn depot_embed(
     if !changes.removed.is_empty() {
         let lines: Vec<String> = changes.removed.iter().map(|id| depot_link(id)).collect();
         sections.push(format!(
-            "**🗑️ Entfernte Depots ({})**\n{}",
+            "**🗑️ Removed depots ({})**\n{}",
             changes.removed.len(),
             lines.join("\n")
         ));
@@ -165,26 +165,23 @@ pub fn depot_embed(
                 lines.push(format!("└ {}", manifest_line(&depot.id, m)));
             }
             if depot.other_keys > 0 {
-                lines.push(format!(
-                    "└ {} Konfigurationswert(e) geändert",
-                    depot.other_keys
-                ));
+                lines.push(format!("└ {} config value(s) changed", depot.other_keys));
             }
         }
         sections.push(format!(
-            "**🔄 Geänderte Depots ({})**\n{}",
+            "**🔄 Changed depots ({})**\n{}",
             changes.changed.len(),
             lines.join("\n")
         ));
     }
 
     base_embed()
-        .author(CreateEmbedAuthor::new(format!("{app_name} · {appid}")).icon_url(CS2_ICON))
-        .title(format!("📦 Depot-Änderungen · Changelist #{change_number}"))
+        .author(EmbedAuthorBuilder::new(format!("{app_name} · {appid}")).icon_url(image(CS2_ICON)))
+        .title(format!("📦 Depot changes · Changelist #{change_number}"))
         .url(format!("https://steamdb.info/app/{appid}/depots/"))
         .description(truncate(&sections.join("\n\n"), 4000))
-        .thumbnail(CS2_IMAGE)
-        .footer(CreateEmbedFooter::new("SteamDB · PICS"))
+        .thumbnail(image(CS2_IMAGE))
+        .footer(EmbedFooterBuilder::new("SteamDB · PICS"))
 }
 
 fn depot_link(id: &str) -> String {
@@ -226,8 +223,8 @@ fn manifest_line(depot: &str, m: &ManifestChange) -> String {
         _ => String::new(),
     };
     match (&m.old_gid, &m.new_gid) {
-        (None, Some(_)) => format!("**{}**: neues Manifest {}{size}", m.branch, gid(&m.new_gid)),
-        (Some(_), None) => format!("**{}**: Manifest entfernt", m.branch),
+        (None, Some(_)) => format!("**{}**: new manifest {}{size}", m.branch, gid(&m.new_gid)),
+        (Some(_), None) => format!("**{}**: manifest removed", m.branch),
         // Only the new manifest is linked to stay within Discord's embed limit.
         _ => format!(
             "**{}**: `{}` → {}{size}",

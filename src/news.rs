@@ -3,15 +3,15 @@
 
 use crate::{
     Ctx,
-    discord::{CS2_ICON, CS2_IMAGE, base_embed, timestamp, truncate},
+    discord::{CS2_ICON, CS2_IMAGE, base_embed, image, timestamp, truncate},
 };
 use anyhow::Result;
 use regex::Regex;
 use serde::Deserialize;
-use serenity::all::{CreateEmbedAuthor, CreateEmbedFooter};
 use std::sync::{Arc, LazyLock};
 use tokio::time::{MissedTickBehavior, interval};
 use tracing::{info, warn};
+use twilight_util::builder::embed::{EmbedAuthorBuilder, EmbedBuilder, EmbedFooterBuilder};
 
 const NEWS_URL: &str = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/\
     ?appid=730&count=15&maxlength=0&feeds=steam_community_announcements";
@@ -44,7 +44,7 @@ pub async fn run(ctx: Arc<Ctx>) {
     loop {
         tick.tick().await;
         if let Err(e) = check(&ctx).await {
-            warn!("News-Check fehlgeschlagen: {e:#}");
+            warn!("News check failed: {e:#}");
         }
     }
 }
@@ -63,10 +63,7 @@ async fn check(ctx: &Ctx) -> Result<()> {
 
     let seen = ctx.store.read(|s| s.seen_news.clone()).await;
     let Some(seen) = seen else {
-        info!(
-            "News: {} vorhandene Posts als gesehen markiert",
-            items.len()
-        );
+        info!("News: marked {} existing posts as seen", items.len());
         ctx.store
             .update(|s| items.iter().for_each(|i| s.mark_news_seen(&i.gid)))
             .await;
@@ -74,36 +71,36 @@ async fn check(ctx: &Ctx) -> Result<()> {
     };
 
     for item in items.iter().filter(|i| !seen.contains(&i.gid)) {
-        info!("Neuer CS2-Post: {}", item.title);
+        info!("New CS2 post: {}", item.title);
         ctx.discord.send(news_embed(item), false).await?;
         ctx.store.update(|s| s.mark_news_seen(&item.gid)).await;
     }
     Ok(())
 }
 
-fn news_embed(item: &NewsItem) -> serenity::all::CreateEmbed {
-    let (text, image) = bbcode_to_markdown(&item.contents);
+fn news_embed(item: &NewsItem) -> EmbedBuilder {
+    let (text, first_image) = bbcode_to_markdown(&item.contents);
     let url = format!(
         "https://store.steampowered.com/news/app/730/view/{}",
         item.gid
     );
     let kind = if item.tags.iter().any(|t| t == "patchnotes") {
-        "📝 Neue Patchnotes"
+        "📝 New patch notes"
     } else {
-        "📰 Neuer Blogpost"
+        "📰 New blog post"
     };
     let mut footer = "Steam News · Counter-Strike 2".to_owned();
     if !item.author.is_empty() {
-        footer = format!("von {} · {footer}", item.author);
+        footer = format!("by {} · {footer}", item.author);
     }
 
     base_embed()
-        .author(CreateEmbedAuthor::new(kind).icon_url(CS2_ICON))
+        .author(EmbedAuthorBuilder::new(kind).icon_url(image(CS2_ICON)))
         .title(truncate(&item.title, 256))
-        .url(&url)
+        .url(url)
         .description(truncate(&text, 3900))
-        .image(image.as_deref().unwrap_or(CS2_IMAGE))
-        .footer(CreateEmbedFooter::new(footer))
+        .image(image(first_image.as_deref().unwrap_or(CS2_IMAGE)))
+        .footer(EmbedFooterBuilder::new(footer))
         .timestamp(timestamp(item.date))
 }
 

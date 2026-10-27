@@ -4,12 +4,11 @@
 use crate::{
     Ctx,
     depots::{depot_changes, depot_embed, is_depot_key},
-    discord::{CS2_ICON, CS2_IMAGE, base_embed, timestamp, truncate},
+    discord::{CS2_ICON, CS2_IMAGE, base_embed, image, timestamp, truncate},
     state::AppState,
     vdf::{self, Node},
 };
 use anyhow::{Context, Result, bail};
-use serenity::all::{CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter};
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -23,6 +22,9 @@ use steam_vent_proto::steammessages_clientserver_appinfo::{
 };
 use tokio::time::{MissedTickBehavior, interval, sleep, timeout};
 use tracing::{info, warn};
+use twilight_util::builder::embed::{
+    EmbedAuthorBuilder, EmbedBuilder, EmbedFieldBuilder, EmbedFooterBuilder,
+};
 
 pub const APPS: &[(u32, &str)] = &[
     (730, "Counter-Strike 2"),
@@ -36,13 +38,13 @@ const MAX_DIFF_LINES: usize = 25;
 fn app_name(appid: u32) -> &'static str {
     APPS.iter()
         .find(|(id, _)| *id == appid)
-        .map_or("Unbekannte App", |(_, name)| name)
+        .map_or("Unknown app", |(_, name)| name)
 }
 
 pub async fn run(ctx: Arc<Ctx>) {
     loop {
         if let Err(e) = session(&ctx).await {
-            warn!("Steam-Verbindung verloren: {e:#}");
+            warn!("Lost Steam connection: {e:#}");
         }
         sleep(Duration::from_secs(5)).await;
     }
@@ -50,17 +52,19 @@ pub async fn run(ctx: Arc<Ctx>) {
 
 /// One connection lifetime: connect anonymously, then poll for changes.
 async fn session(ctx: &Ctx) -> Result<()> {
-    let servers = ServerList::discover().await.context("Serverliste")?;
+    let servers = ServerList::discover()
+        .await
+        .context("server list discovery")?;
     let conn = timeout(REQUEST_TIMEOUT, Connection::anonymous(&servers))
         .await
-        .context("Login-Timeout")??;
-    info!("Mit Steam verbunden (anonym)");
+        .context("login timed out")??;
+    info!("Connected to Steam (anonymous)");
 
     // Catch up on anything that changed while we were offline.
     let all: HashMap<u32, u32> = APPS.iter().map(|&(id, _)| (id, 0)).collect();
     let mut pending = check_apps(ctx, &conn, &all).await?;
     let mut since = changes_since(&conn, 0).await?.current_change_number();
-    info!("PICS-Polling ab Changelist {since}");
+    info!("Polling PICS from changelist {since}");
 
     let mut tick = interval(ctx.config.pics_interval);
     tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -98,7 +102,7 @@ async fn changes_since(
     };
     Ok(timeout(REQUEST_TIMEOUT, conn.job(req))
         .await
-        .context("ChangesSince-Timeout")??)
+        .context("ChangesSince timed out")??)
 }
 
 /// Fetches appinfo for `apps` (appid -> expected minimum change number),
@@ -122,9 +126,9 @@ async fn check_apps(
     };
     let resp: CMsgClientPICSProductInfoResponse = timeout(REQUEST_TIMEOUT, conn.job(req))
         .await
-        .context("ProductInfo-Timeout")??;
+        .context("ProductInfo timed out")??;
     if resp.apps.is_empty() && !apps.is_empty() {
-        bail!("ProductInfo ohne Apps beantwortet");
+        bail!("ProductInfo returned no apps");
     }
 
     let mut still_pending = HashMap::new();
@@ -147,17 +151,17 @@ async fn check_apps(
         let old = ctx.store.read(|s| s.apps.get(&appid).cloned()).await;
         match old {
             None => info!(
-                "{} ({appid}): Basis Changelist {change_number}",
+                "{} ({appid}): baseline changelist {change_number}",
                 app_name(appid)
             ),
             Some(old) if change_number > old.change_number => {
                 info!(
-                    "{} ({appid}): neuer Changelist {change_number}",
+                    "{} ({appid}): new changelist {change_number}",
                     app_name(appid)
                 );
                 if let Err(e) = announce(ctx, appid, &old, &new).await {
                     // Keep the old state so the next poll retries the post.
-                    warn!("Discord-Post fehlgeschlagen: {e:#}");
+                    warn!("Discord post failed: {e:#}");
                     still_pending.insert(appid, change_number);
                     continue;
                 }
@@ -234,29 +238,40 @@ fn build_changes(
     out
 }
 
-fn update_embed(appid: u32, build: &BuildChange, change_number: u32) -> CreateEmbed {
+fn update_embed(appid: u32, build: &BuildChange, change_number: u32) -> EmbedBuilder {
     let when = build
         .time_updated
-        .map_or("gerade eben".into(), |t| format!("<t:{t}:R>"));
+        .map_or("just now".into(), |t| format!("<t:{t}:R>"));
     let mut embed = base_embed()
-        .author(CreateEmbedAuthor::new("Steam-Update erkannt").icon_url(CS2_ICON))
-        .title(format!("🚨 {} wurde aktualisiert!", app_name(appid)))
+        .author(EmbedAuthorBuilder::new("Steam update detected").icon_url(image(CS2_ICON)))
+        .title(format!("🚨 {} has been updated!", app_name(appid)))
         .url(format!("https://steamdb.info/patchnotes/{}/", build.new))
-        .description("Ein neuer Build ist auf dem **public**-Branch live.")
-        .field("Neuer Build", format!("`{}`", build.new), true)
-        .field("Alter Build", format!("`{}`", build.old.as_deref().unwrap_or("–")), true)
-        .field("Changelist", format!("[#{change_number}](https://steamdb.info/changelist/{change_number}/)"), true)
-        .field("Live seit", when, true)
+        .description("A new build is live on the **public** branch.")
+        .field(EmbedFieldBuilder::new("New build", format!("`{}`", build.new)).inline())
         .field(
+            EmbedFieldBuilder::new(
+                "Previous build",
+                format!("`{}`", build.old.as_deref().unwrap_or("–")),
+            )
+            .inline(),
+        )
+        .field(
+            EmbedFieldBuilder::new(
+                "Changelist",
+                format!("[#{change_number}](https://steamdb.info/changelist/{change_number}/)"),
+            )
+            .inline(),
+        )
+        .field(EmbedFieldBuilder::new("Live since", when).inline())
+        .field(EmbedFieldBuilder::new(
             "Links",
             format!(
-                "[Patchnotes](https://steamdb.info/patchnotes/{}/) · [Depots](https://steamdb.info/app/{appid}/depots/) · [Offizielle Updates](https://www.counter-strike.net/news/updates)",
+                "[Patch notes](https://steamdb.info/patchnotes/{}/) · [Depots](https://steamdb.info/app/{appid}/depots/) · [Official updates](https://www.counter-strike.net/news/updates)",
                 build.new
             ),
-            false,
-        )
-        .image(CS2_IMAGE)
-        .footer(CreateEmbedFooter::new("SteamDB · PICS"));
+        ))
+        .image(image(CS2_IMAGE))
+        .footer(EmbedFooterBuilder::new("SteamDB · PICS"));
     if let Some(t) = build.time_updated {
         embed = embed.timestamp(timestamp(t));
     }
@@ -270,14 +285,12 @@ fn changelist_embed(
     builds: &[BuildChange],
     diff: &[String],
     has_depot_changes: bool,
-) -> CreateEmbed {
+) -> EmbedBuilder {
     let mut description = String::new();
     if diff.is_empty() && has_depot_changes {
-        description.push_str("*Nur Depot-Änderungen, Details im nächsten Embed.*");
+        description.push_str("*Depot changes only, see the next embed.*");
     } else if diff.is_empty() {
-        description.push_str(
-            "*Keine sichtbaren Änderungen. Die App-Infos sind ohne Access-Token gesperrt.*",
-        );
+        description.push_str("*No visible changes. This app's info requires an access token.*");
     } else {
         let shown = diff
             .iter()
@@ -288,26 +301,31 @@ fn changelist_embed(
         let more = diff.len().saturating_sub(MAX_DIFF_LINES);
         description = format!("```diff\n{}\n```", truncate(&shown, 3800));
         if more > 0 {
-            description.push_str(&format!("…und {more} weitere Änderungen"));
+            description.push_str(&format!("…and {more} more changes"));
         }
     }
 
     let mut embed = base_embed()
-        .author(CreateEmbedAuthor::new(format!("{} · {appid}", app_name(appid))).icon_url(CS2_ICON))
+        .author(
+            EmbedAuthorBuilder::new(format!("{} · {appid}", app_name(appid)))
+                .icon_url(image(CS2_ICON)),
+        )
         .title(format!("Changelist #{new_cl}"))
         .url(format!("https://steamdb.info/changelist/{new_cl}/"))
         .description(description)
-        .thumbnail(CS2_IMAGE)
+        .thumbnail(image(CS2_IMAGE))
         .field(
-            "App",
-            format!(
-                "[{}](https://steamdb.info/app/{appid}/history/)",
-                app_name(appid)
-            ),
-            true,
+            EmbedFieldBuilder::new(
+                "App",
+                format!(
+                    "[{}](https://steamdb.info/app/{appid}/history/)",
+                    app_name(appid)
+                ),
+            )
+            .inline(),
         )
-        .field("Vorheriger CL", format!("#{old_cl}"), true)
-        .footer(CreateEmbedFooter::new("SteamDB · PICS"));
+        .field(EmbedFieldBuilder::new("Previous changelist", format!("#{old_cl}")).inline())
+        .footer(EmbedFooterBuilder::new("SteamDB · PICS"));
 
     if !builds.is_empty() {
         let lines = builds
@@ -316,13 +334,16 @@ fn changelist_embed(
                 format!(
                     "**{}**: `{}` → `{}`",
                     b.branch,
-                    b.old.as_deref().unwrap_or("neu"),
+                    b.old.as_deref().unwrap_or("new"),
                     b.new
                 )
             })
             .collect::<Vec<_>>()
             .join("\n");
-        embed = embed.field("Build-Änderungen", truncate(&lines, 1024), false);
+        embed = embed.field(EmbedFieldBuilder::new(
+            "Build changes",
+            truncate(&lines, 1024),
+        ));
     }
     embed
 }
