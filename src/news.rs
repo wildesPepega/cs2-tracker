@@ -2,8 +2,8 @@
 //! Steam News API.
 
 use crate::{
-    discord::{CS2_ICON, CS2_IMAGE, base_embed, timestamp, truncate},
     Ctx,
+    discord::{CS2_ICON, CS2_IMAGE, base_embed, timestamp, truncate},
 };
 use anyhow::Result;
 use regex::Regex;
@@ -63,7 +63,10 @@ async fn check(ctx: &Ctx) -> Result<()> {
 
     let seen = ctx.store.read(|s| s.seen_news.clone()).await;
     let Some(seen) = seen else {
-        info!("News: {} vorhandene Posts als gesehen markiert", items.len());
+        info!(
+            "News: {} vorhandene Posts als gesehen markiert",
+            items.len()
+        );
         ctx.store
             .update(|s| items.iter().for_each(|i| s.mark_news_seen(&i.gid)))
             .await;
@@ -80,7 +83,10 @@ async fn check(ctx: &Ctx) -> Result<()> {
 
 fn news_embed(item: &NewsItem) -> serenity::all::CreateEmbed {
     let (text, image) = bbcode_to_markdown(&item.contents);
-    let url = format!("https://store.steampowered.com/news/app/730/view/{}", item.gid);
+    let url = format!(
+        "https://store.steampowered.com/news/app/730/view/{}",
+        item.gid
+    );
     let kind = if item.tags.iter().any(|t| t == "patchnotes") {
         "📝 Neue Patchnotes"
     } else {
@@ -101,9 +107,8 @@ fn news_embed(item: &NewsItem) -> serenity::all::CreateEmbed {
         .timestamp(timestamp(item.date))
 }
 
-static TAG: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"\[(/?)([a-zA-Z0-9*]+)(?:=([^\]]*)|\s([^\]]*))?\]"#).unwrap()
-});
+static TAG: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"\[(/?)([a-zA-Z0-9*]+)(?:=([^\]]*)|\s([^\]]*))?\]"#).unwrap());
 static SRC_ATTR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"src="([^"]+)""#).unwrap());
 static BLANK_LINES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n{3,}").unwrap());
 
@@ -209,7 +214,10 @@ mod tests {
     fn converts_patchnotes() {
         let input = r"[p]\[ UI ][/p][list][*][p]Added a bar[/p][/*][*][p]Nested[/p][list][*][p]Deep[/p][/*][/list][/*][/list][p][/p][p]\[ MISC ][/p]";
         let (md, img) = bbcode_to_markdown(input);
-        assert_eq!(md, "[ UI ]\n\n• Added a bar\n• Nested\n  • Deep\n\n[ MISC ]");
+        assert_eq!(
+            md,
+            "[ UI ]\n\n• Added a bar\n• Nested\n  • Deep\n\n[ MISC ]"
+        );
         assert_eq!(img, None);
     }
 
@@ -218,9 +226,15 @@ mod tests {
         let input = r#"[img src="{STEAM_CLAN_IMAGE}/123/abc.png"][/img][p]See [url="https://x.y"]here[/url][/p]"#;
         let (md, img) = bbcode_to_markdown(input);
         assert_eq!(md, "See [here](https://x.y)");
-        assert_eq!(img.as_deref(), Some("https://clan.akamai.steamstatic.com/images/123/abc.png"));
+        assert_eq!(
+            img.as_deref(),
+            Some("https://clan.akamai.steamstatic.com/images/123/abc.png")
+        );
 
         let (_, img) = bbcode_to_markdown("[img]{STEAM_CLAN_IMAGE}/1/2.jpg[/img]");
-        assert_eq!(img.as_deref(), Some("https://clan.akamai.steamstatic.com/images/1/2.jpg"));
+        assert_eq!(
+            img.as_deref(),
+            Some("https://clan.akamai.steamstatic.com/images/1/2.jpg")
+        );
     }
 }

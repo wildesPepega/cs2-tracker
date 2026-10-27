@@ -129,7 +129,8 @@ mod tests {
         let root = parse(text).unwrap();
         assert_eq!(root.path("appid").and_then(Node::as_str), Some("730"));
         assert_eq!(
-            root.path("depots/branches/public/buildid").and_then(Node::as_str),
+            root.path("depots/branches/public/buildid")
+                .and_then(Node::as_str),
             Some("123")
         );
     }

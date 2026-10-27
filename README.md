@@ -6,7 +6,7 @@ Discord-Bot, der Counter-Strike 2 überwacht und Änderungen als Embeds in einen
 
 | Quelle | Was | Intervall |
 |---|---|---|
-| Steam PICS (dieselbe Quelle wie SteamDB) | Changelists für **730** (CS2), **2275500** (DevClient), **2275530** (DevServer). Neue Builds auf dem `public`-Branch bekommen ein eigenes Update-Embed mit Rollen-Ping. | 2 s |
+| Steam PICS (dieselbe Quelle wie SteamDB) | Changelists für **730** (CS2), **2275500** (DevClient), **2275530** (DevServer). Neue Builds auf dem `public`-Branch bekommen ein eigenes Update-Embed mit Rollen-Ping. Depot-Änderungen (neue, entfernte und geänderte Depots inkl. neuer Manifeste pro Branch und Größenänderung) bekommen ein eigenes Embed. | 2 s |
 | Steam News API | Offizielle CS2-Patchnotes und -Blogposts | 20 s |
 | FxTwitter API | Banner-Änderungen von [@CounterStrike](https://x.com/CounterStrike) | 60 s |
 

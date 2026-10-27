@@ -6,7 +6,8 @@ use serenity::{
 
 pub const CS2_COLOR: u32 = 0xDE9B35;
 pub const CS2_IMAGE: &str = "https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg";
-pub const CS2_ICON: &str = "https://cdn.cloudflare.steamstatic.com/steam/apps/730/capsule_231x87.jpg";
+pub const CS2_ICON: &str =
+    "https://cdn.cloudflare.steamstatic.com/steam/apps/730/capsule_231x87.jpg";
 
 pub struct Discord {
     http: Http,

@@ -1,8 +1,8 @@
 //! Detects profile banner changes on X/Twitter via the public FxTwitter API.
 
 use crate::{
-    discord::{CS2_ICON, base_embed, timestamp},
     Ctx,
+    discord::{CS2_ICON, base_embed, timestamp},
 };
 use anyhow::Result;
 use serde::Deserialize;

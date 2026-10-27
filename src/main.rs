@@ -1,4 +1,5 @@
 mod config;
+mod depots;
 mod discord;
 mod news;
 mod state;
@@ -31,7 +32,11 @@ async fn main() -> Result<()> {
         .init();
 
     let config = Config::from_env()?;
-    let discord = Discord::new(&config.discord_token, config.channel_id, config.ping_role_id);
+    let discord = Discord::new(
+        &config.discord_token,
+        config.channel_id,
+        config.ping_role_id,
+    );
     let channel = discord.check().await?;
     info!("Poste in {channel}");
 

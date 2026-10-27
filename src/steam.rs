@@ -2,10 +2,11 @@
 //! changelists and builds.
 
 use crate::{
+    Ctx,
+    depots::{depot_changes, depot_embed, is_depot_key},
     discord::{CS2_ICON, CS2_IMAGE, base_embed, timestamp, truncate},
     state::AppState,
     vdf::{self, Node},
-    Ctx,
 };
 use anyhow::{Context, Result, bail};
 use serenity::all::{CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter};
@@ -85,14 +86,19 @@ async fn session(ctx: &Ctx) -> Result<()> {
     }
 }
 
-async fn changes_since(conn: &Connection, since: u32) -> Result<CMsgClientPICSChangesSinceResponse> {
+async fn changes_since(
+    conn: &Connection,
+    since: u32,
+) -> Result<CMsgClientPICSChangesSinceResponse> {
     let req = CMsgClientPICSChangesSinceRequest {
         since_change_number: Some(since),
         send_app_info_changes: Some(true),
         send_package_info_changes: Some(false),
         ..Default::default()
     };
-    Ok(timeout(REQUEST_TIMEOUT, conn.job(req)).await.context("ChangesSince-Timeout")??)
+    Ok(timeout(REQUEST_TIMEOUT, conn.job(req))
+        .await
+        .context("ChangesSince-Timeout")??)
 }
 
 /// Fetches appinfo for `apps` (appid -> expected minimum change number),
@@ -114,8 +120,9 @@ async fn check_apps(
         single_response: Some(true),
         ..Default::default()
     };
-    let resp: CMsgClientPICSProductInfoResponse =
-        timeout(REQUEST_TIMEOUT, conn.job(req)).await.context("ProductInfo-Timeout")??;
+    let resp: CMsgClientPICSProductInfoResponse = timeout(REQUEST_TIMEOUT, conn.job(req))
+        .await
+        .context("ProductInfo-Timeout")??;
     if resp.apps.is_empty() && !apps.is_empty() {
         bail!("ProductInfo ohne Apps beantwortet");
     }
@@ -132,16 +139,22 @@ async fn check_apps(
 
         let text = String::from_utf8_lossy(app.buffer());
         let info = vdf::parse(&text).map(|n| flatten(&n)).unwrap_or_default();
-        let new = AppState { change_number, info };
+        let new = AppState {
+            change_number,
+            info,
+        };
 
-        let old = ctx
-            .store
-            .read(|s| s.apps.get(&appid).cloned())
-            .await;
+        let old = ctx.store.read(|s| s.apps.get(&appid).cloned()).await;
         match old {
-            None => info!("{} ({appid}): Basis Changelist {change_number}", app_name(appid)),
+            None => info!(
+                "{} ({appid}): Basis Changelist {change_number}",
+                app_name(appid)
+            ),
             Some(old) if change_number > old.change_number => {
-                info!("{} ({appid}): neuer Changelist {change_number}", app_name(appid));
+                info!(
+                    "{} ({appid}): neuer Changelist {change_number}",
+                    app_name(appid)
+                );
                 if let Err(e) = announce(ctx, appid, &old, &new).await {
                     // Keep the old state so the next poll retries the post.
                     warn!("Discord-Post fehlgeschlagen: {e:#}");
@@ -159,12 +172,33 @@ async fn check_apps(
 async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Result<()> {
     let diff = diff(&old.info, &new.info);
     let builds = build_changes(&old.info, &new.info);
+    let depots = depot_changes(&old.info, &new.info);
 
     if let Some(public) = builds.iter().find(|b| b.branch == "public") {
-        ctx.discord.send(update_embed(appid, public, new.change_number), true).await?;
+        ctx.discord
+            .send(update_embed(appid, public, new.change_number), true)
+            .await?;
     }
-    let embed = changelist_embed(appid, old.change_number, new.change_number, &builds, &diff);
-    ctx.discord.send(embed, false).await
+    let embed = changelist_embed(
+        appid,
+        old.change_number,
+        new.change_number,
+        &builds,
+        &diff,
+        !depots.is_empty(),
+    );
+    ctx.discord.send(embed, false).await?;
+    if !depots.is_empty() {
+        let embed = depot_embed(
+            app_name(appid),
+            appid,
+            new.change_number,
+            &depots,
+            &new.info,
+        );
+        ctx.discord.send(embed, false).await?;
+    }
+    Ok(())
 }
 
 struct BuildChange {
@@ -174,11 +208,16 @@ struct BuildChange {
     time_updated: Option<i64>,
 }
 
-fn build_changes(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>) -> Vec<BuildChange> {
+fn build_changes(
+    old: &BTreeMap<String, String>,
+    new: &BTreeMap<String, String>,
+) -> Vec<BuildChange> {
     let mut out: Vec<BuildChange> = new
         .iter()
         .filter_map(|(path, build)| {
-            let branch = path.strip_prefix("depots/branches/")?.strip_suffix("/buildid")?;
+            let branch = path
+                .strip_prefix("depots/branches/")?
+                .strip_suffix("/buildid")?;
             let old_build = old.get(path);
             (old_build != Some(build)).then(|| BuildChange {
                 branch: branch.to_owned(),
@@ -196,7 +235,9 @@ fn build_changes(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>)
 }
 
 fn update_embed(appid: u32, build: &BuildChange, change_number: u32) -> CreateEmbed {
-    let when = build.time_updated.map_or("gerade eben".into(), |t| format!("<t:{t}:R>"));
+    let when = build
+        .time_updated
+        .map_or("gerade eben".into(), |t| format!("<t:{t}:R>"));
     let mut embed = base_embed()
         .author(CreateEmbedAuthor::new("Steam-Update erkannt").icon_url(CS2_ICON))
         .title(format!("🚨 {} wurde aktualisiert!", app_name(appid)))
@@ -228,12 +269,22 @@ fn changelist_embed(
     new_cl: u32,
     builds: &[BuildChange],
     diff: &[String],
+    has_depot_changes: bool,
 ) -> CreateEmbed {
     let mut description = String::new();
-    if diff.is_empty() {
-        description.push_str("*Keine sichtbaren Änderungen. Die App-Infos sind ohne Access-Token gesperrt.*");
+    if diff.is_empty() && has_depot_changes {
+        description.push_str("*Nur Depot-Änderungen, Details im nächsten Embed.*");
+    } else if diff.is_empty() {
+        description.push_str(
+            "*Keine sichtbaren Änderungen. Die App-Infos sind ohne Access-Token gesperrt.*",
+        );
     } else {
-        let shown = diff.iter().take(MAX_DIFF_LINES).cloned().collect::<Vec<_>>().join("\n");
+        let shown = diff
+            .iter()
+            .take(MAX_DIFF_LINES)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
         let more = diff.len().saturating_sub(MAX_DIFF_LINES);
         description = format!("```diff\n{}\n```", truncate(&shown, 3800));
         if more > 0 {
@@ -247,7 +298,14 @@ fn changelist_embed(
         .url(format!("https://steamdb.info/changelist/{new_cl}/"))
         .description(description)
         .thumbnail(CS2_IMAGE)
-        .field("App", format!("[{}](https://steamdb.info/app/{appid}/history/)", app_name(appid)), true)
+        .field(
+            "App",
+            format!(
+                "[{}](https://steamdb.info/app/{appid}/history/)",
+                app_name(appid)
+            ),
+            true,
+        )
         .field("Vorheriger CL", format!("#{old_cl}"), true)
         .footer(CreateEmbedFooter::new("SteamDB · PICS"));
 
@@ -277,7 +335,11 @@ fn flatten(node: &Node) -> BTreeMap<String, String> {
             }
             Node::Obj(map) => {
                 for (k, v) in map {
-                    let path = if prefix.is_empty() { k.clone() } else { format!("{prefix}/{k}") };
+                    let path = if prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{prefix}/{k}")
+                    };
                     walk(v, &path, out);
                 }
             }
@@ -288,11 +350,12 @@ fn flatten(node: &Node) -> BTreeMap<String, String> {
     out
 }
 
-/// SteamDB-style key diff, formatted for a ```diff block.
+/// SteamDB-style key diff, formatted for a ```diff block. Depot keys are
+/// left out; they get their own embed.
 fn diff(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>) -> Vec<String> {
     let clean = |s: &str| truncate(&s.replace("```", "'''").replace('\n', " "), 80);
     let mut lines = Vec::new();
-    for (k, v) in new {
+    for (k, v) in new.iter().filter(|(k, _)| !is_depot_key(k)) {
         match old.get(k) {
             None => lines.push(format!("+ {k}: {}", clean(v))),
             Some(o) if o != v => {
@@ -302,7 +365,7 @@ fn diff(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>) -> Vec<S
             Some(_) => {}
         }
     }
-    for (k, v) in old {
+    for (k, v) in old.iter().filter(|(k, _)| !is_depot_key(k)) {
         if !new.contains_key(k) {
             lines.push(format!("- {k}: {}", clean(v)));
         }
@@ -315,7 +378,10 @@ mod tests {
     use super::*;
 
     fn map(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]

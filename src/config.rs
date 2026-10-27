@@ -36,7 +36,9 @@ impl Config {
 fn optional(key: &str) -> Result<Option<u64>> {
     match env::var(key) {
         Ok(v) if !v.trim().is_empty() => Ok(Some(
-            v.trim().parse().with_context(|| format!("{key} ist keine Zahl"))?,
+            v.trim()
+                .parse()
+                .with_context(|| format!("{key} ist keine Zahl"))?,
         )),
         _ => Ok(None),
     }
