@@ -1,0 +1,112 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-10-27T00:00:00+00:00",
+    "name": "CS2 Tracker",
+    "author": "wildesPepega@users.noreply.github.com",
+    "description": "Discord-Bot, der Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) per Steam PICS auf Changelists und Updates überwacht und zusätzlich CS2-Blogposts sowie Twitter-Banner-Änderungen von @CounterStrike postet.",
+    "features": null,
+    "docker_images": {
+        "Debian": "ghcr.io/parkervcp/yolks:debian"
+    },
+    "file_denylist": [],
+    "startup": "./cs2-tracker",
+    "config": {
+        "files": "{}",
+        "startup": "{\"done\": \"Mit Steam verbunden\"}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# CS2 Tracker - Installationsskript\n# Lädt das passende vorgebaute Release-Binary von GitHub herunter.\nset -euo pipefail\n\nREPO=\"wildesPepega/cs2-tracker\"\n\ncase \"$(uname -m)\" in\n    x86_64|amd64)  ARCH=\"x86_64\" ;;\n    aarch64|arm64) ARCH=\"aarch64\" ;;\n    *) echo \"Nicht unterstützte Architektur: $(uname -m)\"; exit 1 ;;\nesac\n\nif [ -z \"${VERSION:-}\" ] || [ \"${VERSION}\" = \"latest\" ]; then\n    URL=\"https://github.com/${REPO}/releases/latest/download/cs2-tracker-linux-${ARCH}\"\nelse\n    URL=\"https://github.com/${REPO}/releases/download/${VERSION}/cs2-tracker-linux-${ARCH}\"\nfi\n\nmkdir -p /mnt/server\ncd /mnt/server\n\necho \"Lade ${URL}\"\ncurl -fsSL -o cs2-tracker.new \"${URL}\"\nchmod +x cs2-tracker.new\nmv cs2-tracker.new cs2-tracker\n\n# state.json bleibt bei Neuinstallationen erhalten, damit nichts doppelt gepostet wird.\necho \"Installation abgeschlossen.\"\n",
+            "container": "ghcr.io/pterodactyl/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Discord Bot Token",
+            "description": "Token des Bots aus dem Discord Developer Portal.",
+            "env_variable": "DISCORD_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|min:50",
+            "field_type": "text"
+        },
+        {
+            "name": "Discord Channel ID",
+            "description": "ID des Channels, in den gepostet wird.",
+            "env_variable": "DISCORD_CHANNEL_ID",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|numeric|digits_between:17,20",
+            "field_type": "text"
+        },
+        {
+            "name": "Ping-Rolle (optional)",
+            "description": "Rollen-ID, die bei neuen public CS2-Builds gepingt wird. Leer lassen für keinen Ping.",
+            "env_variable": "PING_ROLE_ID",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|numeric|digits_between:17,20",
+            "field_type": "text"
+        },
+        {
+            "name": "PICS-Intervall (ms)",
+            "description": "Wie oft Steam auf neue Changelists geprüft wird.",
+            "env_variable": "PICS_INTERVAL_MS",
+            "default_value": "2000",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:1000|max:60000",
+            "field_type": "text"
+        },
+        {
+            "name": "News-Intervall (s)",
+            "description": "Wie oft die Steam News API auf neue CS2-Posts geprüft wird.",
+            "env_variable": "NEWS_INTERVAL_SECS",
+            "default_value": "20",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:5|max:3600",
+            "field_type": "text"
+        },
+        {
+            "name": "Twitter-Intervall (s)",
+            "description": "Wie oft der Twitter-Banner geprüft wird.",
+            "env_variable": "TWITTER_INTERVAL_SECS",
+            "default_value": "60",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|min:15|max:3600",
+            "field_type": "text"
+        },
+        {
+            "name": "Twitter-Handle",
+            "description": "X/Twitter-Account, dessen Banner überwacht wird.",
+            "env_variable": "TWITTER_HANDLE",
+            "default_value": "CounterStrike",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:15",
+            "field_type": "text"
+        },
+        {
+            "name": "Version",
+            "description": "Release-Tag (z. B. v0.1.0) oder 'latest'. Nach Änderung den Server neu installieren.",
+            "env_variable": "VERSION",
+            "default_value": "latest",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:20",
+            "field_type": "text"
+        }
+    ]
+}
