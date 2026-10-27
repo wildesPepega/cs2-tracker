@@ -1,7 +1,7 @@
-//! Keeps the bot online via the Discord gateway and rotates CS-themed
-//! statuses.
+//! Keeps the bot online via the Discord gateway, rotates CS-themed statuses
+//! and dispatches slash commands.
 
-use crate::{Ctx, config::Platform};
+use crate::{Ctx, commands, config::Platform};
 use anyhow::Result;
 use std::{sync::Arc, time::SystemTime};
 use tokio::time::{MissedTickBehavior, interval};
@@ -185,7 +185,7 @@ pub async fn run(ctx: Arc<Ctx>) {
     }
 }
 
-async fn session(ctx: &Ctx) -> Result<()> {
+async fn session(ctx: &Arc<Ctx>) -> Result<()> {
     // Start at a random spot so restarts don't always show the same status.
     let mut index = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -205,9 +205,15 @@ async fn session(ctx: &Ctx) -> Result<()> {
 
     loop {
         tokio::select! {
-            event = shard.next_event(EventTypeFlags::READY) => match event {
+            event = shard.next_event(EventTypeFlags::READY | EventTypeFlags::INTERACTION_CREATE) => match event {
                 Some(Ok(Event::Ready(ready))) => {
                     info!("Discord gateway ready as {}", ready.user.name);
+                    if let Err(e) = commands::register(ctx, ready.application.id).await {
+                        warn!("Failed to register slash commands: {e:#}");
+                    }
+                }
+                Some(Ok(Event::InteractionCreate(interaction))) => {
+                    tokio::spawn(commands::handle(ctx.clone(), interaction.0));
                 }
                 Some(Ok(_)) => {}
                 // The shard reconnects on its own after non-fatal errors.

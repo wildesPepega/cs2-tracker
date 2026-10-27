@@ -30,6 +30,10 @@ impl Discord {
         }
     }
 
+    pub fn http(&self) -> &Client {
+        &self.http
+    }
+
     /// Fails fast at startup if the token or channel is wrong.
     pub async fn check(&self) -> Result<String> {
         let channel = self.http.channel(self.channel).await?.model().await?;

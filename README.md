@@ -15,13 +15,14 @@ It also:
 
 - **shows up as online** with a rotating set of 150+ CS-themed statuses ("Playing de_mirage", "Listening to the bomb beeps", …). By default it uses the VR platform icon (see [Presence](#presence)).
 - **updates itself.** It checks GitHub releases, swaps its own binary and restarts in place.
+- has an admin-only **`/preview`** command that shows example embeds built from the live data (see [Commands](#commands)).
 
 The bot logs in to Steam anonymously, so you don't need a Steam account. For the dev apps, the app info is hidden without an access token, so only their changelist numbers are visible. SteamDB doesn't show more publicly either.
 
 ## Setup
 
 1. Create an application with a bot in the [Discord Developer Portal](https://discord.com/developers/applications) and copy the token. No privileged intents are needed.
-2. Invite the bot (scope `bot`, permissions *View Channel*, *Send Messages* and *Embed Links*). For role pings, make the role mentionable or grant *Mention Everyone*.
+2. Invite the bot (scopes `bot` and `applications.commands`, permissions *View Channel*, *Send Messages* and *Embed Links*). For role pings, make the role mentionable or grant *Mention Everyone*.
 3. Run `cp .env.example .env` and fill in the values.
 4. Run it, either with a static binary from the [releases](https://github.com/wildesPepega/cs2-tracker/releases) (Linux x86_64/aarch64):
 
@@ -57,6 +58,16 @@ All settings are environment variables (a `.env` file is loaded automatically).
 | `AUTO_UPDATE` | `true` | Install new releases automatically |
 | `UPDATE_INTERVAL_MINS` | `10` | How often to check for updates |
 | `STATE_FILE` | `state.json` | Where the state is stored |
+
+## Commands
+
+| Command | Who | What |
+|---|---|---|
+| `/preview` | Administrators | Replies with a bot status overview and example embeds built from the current data: a CS2 update, changelists for all three apps, depot changes, the latest blog post and the current Twitter banner. Changes are simulated. The replies are ephemeral, so only you can see them. |
+
+The command is registered globally when the bot connects. New global commands can take a few minutes to show up.
+By default only administrators can see it. Server owners can change that under *Server Settings → Integrations*,
+but the bot still refuses anyone without the *Administrator* permission.
 
 ## Presence
 

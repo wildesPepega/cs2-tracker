@@ -49,7 +49,7 @@ pub async fn run(ctx: Arc<Ctx>) {
     }
 }
 
-async fn check(ctx: &Ctx) -> Result<()> {
+async fn fetch(ctx: &Ctx) -> Result<Vec<NewsItem>> {
     let resp: Response = ctx
         .http
         .get(NEWS_URL)
@@ -60,7 +60,16 @@ async fn check(ctx: &Ctx) -> Result<()> {
         .await?;
     let mut items = resp.appnews.newsitems;
     items.sort_by_key(|i| i.date);
+    Ok(items)
+}
 
+/// Embed for the most recent post, for the admin `/preview` command.
+pub async fn latest_embed(ctx: &Ctx) -> Result<Option<EmbedBuilder>> {
+    Ok(fetch(ctx).await?.last().map(news_embed))
+}
+
+async fn check(ctx: &Ctx) -> Result<()> {
+    let items = fetch(ctx).await?;
     let seen = ctx.store.read(|s| s.seen_news.clone()).await;
     let Some(seen) = seen else {
         info!("News: marked {} existing posts as seen", items.len());

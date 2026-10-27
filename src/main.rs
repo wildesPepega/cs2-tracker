@@ -1,3 +1,4 @@
+mod commands;
 mod config;
 mod depots;
 mod discord;
@@ -13,7 +14,10 @@ use anyhow::{Context, Result};
 use config::Config;
 use discord::Discord;
 use state::Store;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tracing::info;
 
 pub struct Ctx {
@@ -21,6 +25,7 @@ pub struct Ctx {
     pub discord: Discord,
     pub store: Store,
     pub http: reqwest::Client,
+    pub started_at: Instant,
 }
 
 #[tokio::main]
@@ -59,6 +64,7 @@ async fn main() -> Result<()> {
             .build()?,
         discord,
         config,
+        started_at: Instant::now(),
     });
 
     tokio::select! {

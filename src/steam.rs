@@ -35,7 +35,7 @@ pub const APPS: &[(u32, &str)] = &[
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_DIFF_LINES: usize = 25;
 
-fn app_name(appid: u32) -> &'static str {
+pub fn app_name(appid: u32) -> &'static str {
     APPS.iter()
         .find(|(id, _)| *id == appid)
         .map_or("Unknown app", |(_, name)| name)
@@ -205,14 +205,14 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
     Ok(())
 }
 
-struct BuildChange {
+pub struct BuildChange {
     branch: String,
     old: Option<String>,
     new: String,
     time_updated: Option<i64>,
 }
 
-fn build_changes(
+pub fn build_changes(
     old: &BTreeMap<String, String>,
     new: &BTreeMap<String, String>,
 ) -> Vec<BuildChange> {
@@ -238,7 +238,7 @@ fn build_changes(
     out
 }
 
-fn update_embed(appid: u32, build: &BuildChange, change_number: u32) -> EmbedBuilder {
+pub fn update_embed(appid: u32, build: &BuildChange, change_number: u32) -> EmbedBuilder {
     let when = build
         .time_updated
         .map_or("just now".into(), |t| format!("<t:{t}:R>"));
@@ -278,7 +278,7 @@ fn update_embed(appid: u32, build: &BuildChange, change_number: u32) -> EmbedBui
     embed
 }
 
-fn changelist_embed(
+pub fn changelist_embed(
     appid: u32,
     old_cl: u32,
     new_cl: u32,
@@ -373,7 +373,7 @@ fn flatten(node: &Node) -> BTreeMap<String, String> {
 
 /// SteamDB-style key diff, formatted for a ```diff block. Depot keys are
 /// left out; they get their own embed.
-fn diff(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>) -> Vec<String> {
+pub fn diff(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>) -> Vec<String> {
     let clean = |s: &str| truncate(&s.replace("```", "'''").replace('\n', " "), 80);
     let mut lines = Vec::new();
     for (k, v) in new.iter().filter(|(k, _)| !is_depot_key(k)) {
@@ -392,6 +392,52 @@ fn diff(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>) -> Vec<S
         }
     }
     lines
+}
+
+/// Example embeds built from the current state with a simulated changelist,
+/// for the admin `/preview` command.
+pub fn preview_embeds(apps: &BTreeMap<u32, AppState>) -> Vec<EmbedBuilder> {
+    let mut embeds = Vec::new();
+    for (&appid, new) in apps {
+        let mut old = new.clone();
+        old.change_number = new.change_number.saturating_sub(1);
+        // Simulate a new public build plus one depot manifest update.
+        let build_key = "depots/branches/public/buildid";
+        if let Some(build) = new.info.get(build_key).and_then(|b| b.parse::<u64>().ok()) {
+            old.info.insert(build_key.into(), (build - 1).to_string());
+        }
+        if let Some(key) = new
+            .info
+            .keys()
+            .find(|k| is_depot_key(k) && k.ends_with("/manifests/public/gid"))
+        {
+            old.info.insert(key.clone(), "1234567890123456789".into());
+        }
+
+        let builds = build_changes(&old.info, &new.info);
+        let depots = depot_changes(&old.info, &new.info);
+        if let Some(public) = builds.iter().find(|b| b.branch == "public") {
+            embeds.push(update_embed(appid, public, new.change_number));
+        }
+        embeds.push(changelist_embed(
+            appid,
+            old.change_number,
+            new.change_number,
+            &builds,
+            &diff(&old.info, &new.info),
+            !depots.is_empty(),
+        ));
+        if !depots.is_empty() {
+            embeds.push(depot_embed(
+                app_name(appid),
+                appid,
+                new.change_number,
+                &depots,
+                &new.info,
+            ));
+        }
+    }
+    embeds
 }
 
 #[cfg(test)]
@@ -423,6 +469,32 @@ mod tests {
         assert_eq!(builds[0].old.as_deref(), Some("1"));
         assert_eq!(builds[0].time_updated, Some(1_700_000_000));
         assert_eq!(builds[1].old, None);
+    }
+
+    #[test]
+    fn preview_embeds_pass_discord_validation() {
+        let mut apps = BTreeMap::new();
+        apps.insert(
+            730,
+            AppState {
+                change_number: 100,
+                info: map(&[
+                    ("common/name", "Counter-Strike 2"),
+                    ("depots/branches/public/buildid", "26144732"),
+                    ("depots/branches/public/timeupdated", "1792709693"),
+                    ("depots/2347770/manifests/public/gid", "67499503218971311"),
+                    ("depots/2347770/manifests/public/size", "65027793761"),
+                ]),
+            },
+        );
+        apps.insert(2275500, AppState { change_number: 50, info: BTreeMap::new() });
+
+        let embeds = preview_embeds(&apps);
+        // update + changelist + depots for 730, changelist for the dev app
+        assert_eq!(embeds.len(), 4);
+        for embed in embeds {
+            embed.validate().expect("embed within Discord limits");
+        }
     }
 
     #[test]
