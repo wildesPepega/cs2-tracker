@@ -48,6 +48,14 @@ async fn main() -> Result<()> {
     info!("cs2-tracker v{}", updater::VERSION);
 
     let config = Config::from_env()?;
+    let http = reqwest::Client::builder()
+        .user_agent(concat!("cs2-tracker/", env!("CARGO_PKG_VERSION")))
+        .timeout(Duration::from_secs(15))
+        .build()?;
+    if config.auto_update {
+        updater::on_startup(&http, &exe).await;
+    }
+
     let discord = Discord::new(
         &config.discord_token,
         config.channel_id,
@@ -58,10 +66,7 @@ async fn main() -> Result<()> {
 
     let ctx = Arc::new(Ctx {
         store: Store::load(&config.state_file)?,
-        http: reqwest::Client::builder()
-            .user_agent(concat!("cs2-tracker/", env!("CARGO_PKG_VERSION")))
-            .timeout(Duration::from_secs(15))
-            .build()?,
+        http,
         discord,
         config,
         started_at: Instant::now(),
@@ -72,8 +77,26 @@ async fn main() -> Result<()> {
         _ = news::run(ctx.clone()) => {}
         _ = twitter::run(ctx.clone()) => {}
         _ = presence::run(ctx.clone()) => {}
-        _ = updater::run(ctx.clone(), exe) => {}
-        _ = tokio::signal::ctrl_c() => info!("Shutting down"),
+        _ = updater::run(ctx.clone(), exe.clone()) => {}
+        _ = shutdown_signal() => info!("Shutting down"),
+    }
+    if ctx.config.auto_update {
+        updater::on_shutdown(&ctx.http, &exe).await;
     }
     Ok(())
+}
+
+/// Ctrl+C / SIGINT (Pterodactyl's `^C`) or SIGTERM (systemd, Docker).
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut term = signal(SignalKind::terminate()).expect("install SIGTERM handler");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = term.recv() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = tokio::signal::ctrl_c().await;
 }

@@ -487,7 +487,13 @@ mod tests {
                 ]),
             },
         );
-        apps.insert(2275500, AppState { change_number: 50, info: BTreeMap::new() });
+        apps.insert(
+            2275500,
+            AppState {
+                change_number: 50,
+                info: BTreeMap::new(),
+            },
+        );
 
         let embeds = preview_embeds(&apps);
         // update + changelist + depots for 730, changelist for the dev app

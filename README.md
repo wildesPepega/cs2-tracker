@@ -77,15 +77,22 @@ stop honoring it at any time. Set it to `mobile` or `desktop` if the icon doesn'
 
 ## Auto-update
 
-Every `UPDATE_INTERVAL_MINS`, the bot asks GitHub for the latest release. If it's newer than the running version, the bot:
+The bot checks GitHub for a newer release at three points:
 
-1. downloads the binary for its architecture,
-2. runs it with `--version` to make sure it works,
-3. replaces its own executable, and
-4. re-executes itself in the same process.
+- **On startup**, before it connects to anything. If there's an update, it installs it and restarts right away.
+- **Every `UPDATE_INTERVAL_MINS`** while running. If there's an update, it installs it and restarts in place.
+- **On shutdown** (Ctrl+C / SIGINT, which is what Pterodactyl sends, or SIGTERM). If there's an update, it installs it
+  so the next start already runs the new version. This waits at most 20 seconds.
 
-Because the PID stays the same, Pterodactyl and systemd don't see a restart. The bot needs write access to
-the directory its binary lives in. Set `AUTO_UPDATE=false` to turn this off.
+Installing an update means:
+
+1. downloading the binary for its architecture,
+2. running it with `--version` to make sure it works, and
+3. replacing its own executable.
+
+Restarts re-execute the binary in the same process. Because the PID stays the same, Pterodactyl and systemd don't see
+a restart. The bot needs write access to the directory its binary lives in. Set `AUTO_UPDATE=false` to turn all of
+this off.
 
 ## Pterodactyl
 
