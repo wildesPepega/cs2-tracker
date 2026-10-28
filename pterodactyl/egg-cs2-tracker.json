@@ -7,7 +7,7 @@
     "exported_at": "2026-10-27T00:00:00+00:00",
     "name": "CS2 Tracker",
     "author": "wildesPepega@users.noreply.github.com",
-    "description": "Discord bot that watches Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) via Steam PICS for changelists, builds and depot changes, and posts CS2 blog posts and @CounterStrike Twitter banner changes. Updates itself automatically.",
+    "description": "Discord bot that watches Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) via Steam PICS for changelists, builds and depot changes, and posts CS2 blog posts and @CounterStrike Twitter banner and profile picture changes. Updates itself automatically.",
     "features": null,
     "docker_images": {
         "Debian": "ghcr.io/parkervcp/yolks:debian"
@@ -60,7 +60,7 @@
         },
         {
             "name": "Ping Events",
-            "description": "Comma-separated posts that ping the role: update (new public build), changelist, depots, news (blog posts / patch notes), banner. Or all / none.",
+            "description": "Comma-separated posts that ping the role: update (new public build), changelist, depots, news (blog posts / patch notes), banner, avatar (profile picture). Or all / none.",
             "env_variable": "PING_EVENTS",
             "default_value": "update,news",
             "user_viewable": true,
@@ -90,7 +90,7 @@
         },
         {
             "name": "Twitter Interval (s)",
-            "description": "How often the Twitter banner is checked.",
+            "description": "How often the Twitter banner and profile picture are checked.",
             "env_variable": "TWITTER_INTERVAL_SECS",
             "default_value": "60",
             "user_viewable": true,
@@ -100,7 +100,7 @@
         },
         {
             "name": "Twitter Handle",
-            "description": "X/Twitter account whose banner is watched.",
+            "description": "X/Twitter account whose banner and profile picture are watched.",
             "env_variable": "TWITTER_HANDLE",
             "default_value": "CounterStrike",
             "user_viewable": true,

@@ -19,6 +19,8 @@ pub struct State {
     pub seen_news: Option<VecDeque<String>>,
     #[serde(default)]
     pub twitter_banner: Option<String>,
+    #[serde(default)]
+    pub twitter_avatar: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

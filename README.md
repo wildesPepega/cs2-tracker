@@ -9,7 +9,7 @@ A Discord bot written in Rust that watches Counter-Strike 2 and posts every chan
 | Steam PICS (the same data SteamDB uses) | Changelists for **730** (CS2), **2275500** (DevClient) and **2275530** (DevServer). A new build on the `public` branch gets its own update embed. | 2 s |
 | Steam PICS | Depot changes: new, removed and changed depots, including new manifests per branch and size deltas. | with every changelist |
 | Steam News API | Official CS2 patch notes and blog posts | 20 s |
-| FxTwitter API | Banner changes of [@CounterStrike](https://x.com/CounterStrike) | 60 s |
+| FxTwitter API | Banner and profile picture changes of [@CounterStrike](https://x.com/CounterStrike) | 60 s |
 
 It also:
 
@@ -49,11 +49,11 @@ All settings are environment variables (a `.env` file is loaded automatically).
 | `DISCORD_TOKEN` | – | Bot token (required) |
 | `DISCORD_CHANNEL_ID` | – | Channel to post into (required) |
 | `PING_ROLE_ID` | – | Role to ping (the role's ID, not its @mention) |
-| `PING_EVENTS` | `update,news` | Posts that ping the role: `update` (new public build), `changelist`, `depots`, `news`, `banner`, or `all` / `none` |
+| `PING_EVENTS` | `update,news` | Posts that ping the role: `update` (new public build), `changelist`, `depots`, `news`, `banner`, `avatar` (profile picture), or `all` / `none` |
 | `PICS_INTERVAL_MS` | `2000` | Steam changelist polling interval |
 | `NEWS_INTERVAL_SECS` | `20` | Steam News polling interval |
-| `TWITTER_INTERVAL_SECS` | `60` | Twitter banner polling interval |
-| `TWITTER_HANDLE` | `CounterStrike` | Account whose banner is watched |
+| `TWITTER_INTERVAL_SECS` | `60` | Twitter banner / profile picture polling interval |
+| `TWITTER_HANDLE` | `CounterStrike` | Account whose banner and profile picture are watched |
 | `STATUS_INTERVAL_SECS` | `60` | How often the status rotates (min. 15) |
 | `PRESENCE_PLATFORM` | `vr` | Platform icon: `vr`, `mobile` or `desktop` |
 | `AUTO_UPDATE` | `true` | Install new releases automatically |
@@ -64,7 +64,7 @@ All settings are environment variables (a `.env` file is loaded automatically).
 
 | Command | Who | What |
 |---|---|---|
-| `/preview` | Administrators | Replies with a bot status overview and example embeds built from the current data: a CS2 update, changelists for all three apps, depot changes, the latest blog post and the current Twitter banner. Changes are simulated. The replies are ephemeral, so only you can see them. |
+| `/preview` | Administrators | Replies with a bot status overview and example embeds built from the current data: a CS2 update, changelists for all three apps, depot changes, the latest blog post and the current Twitter banner and profile picture. Changes are simulated. The replies are ephemeral, so only you can see them. |
 
 The command is registered globally when the bot connects. New global commands can take a few minutes to show up.
 By default only administrators can see it. Server owners can change that under *Server Settings → Integrations*,

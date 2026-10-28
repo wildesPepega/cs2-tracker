@@ -113,12 +113,23 @@ async fn preview(ctx: &Ctx, interaction: &Interaction) -> Result<()> {
 }
 
 async fn build_previews(ctx: &Ctx) -> Vec<EmbedBuilder> {
-    let (apps, banner) = ctx
+    let (apps, banner, avatar) = ctx
         .store
-        .read(|s| (s.apps.clone(), s.twitter_banner.clone()))
+        .read(|s| {
+            (
+                s.apps.clone(),
+                s.twitter_banner.clone(),
+                s.twitter_avatar.clone(),
+            )
+        })
         .await;
 
-    let mut embeds = vec![status_embed(ctx, &apps, banner.as_deref())];
+    let mut embeds = vec![status_embed(
+        ctx,
+        &apps,
+        banner.as_deref(),
+        avatar.as_deref(),
+    )];
     embeds.extend(steam::preview_embeds(&apps));
     match news::latest_embed(ctx).await {
         Ok(Some(embed)) => embeds.push(embed),
@@ -130,7 +141,14 @@ async fn build_previews(ctx: &Ctx) -> Vec<EmbedBuilder> {
             &ctx.config.twitter_handle,
             Some(banner),
             banner,
-            None,
+            avatar.as_deref(),
+        ));
+    }
+    if let Some(avatar) = &avatar {
+        embeds.push(twitter::avatar_embed(
+            &ctx.config.twitter_handle,
+            Some(avatar),
+            avatar,
         ));
     }
     embeds
@@ -140,6 +158,7 @@ fn status_embed(
     ctx: &Ctx,
     apps: &std::collections::BTreeMap<u32, crate::state::AppState>,
     banner: Option<&str>,
+    avatar: Option<&str>,
 ) -> EmbedBuilder {
     let config = &ctx.config;
     let tracked = steam::APPS
@@ -161,9 +180,18 @@ fn status_embed(
         .collect::<Vec<_>>()
         .join("\n");
     let uptime = ctx.started_at.elapsed().as_secs();
-    let banner = banner.map_or("*not synced yet*".into(), |b| {
-        format!("[current banner]({b}/1500x500)")
-    });
+    let twitter = [
+        banner.map(|b| format!("[banner]({b}/1500x500)")),
+        avatar.map(|a| format!("[profile picture]({a})")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    let twitter = if twitter.is_empty() {
+        "*not synced yet*".into()
+    } else {
+        twitter.join(" · ")
+    };
 
     base_embed()
         .author(EmbedAuthorBuilder::new("CS2 Tracker").icon_url(image(CS2_ICON)))
@@ -205,7 +233,7 @@ fn status_embed(
             )
             .inline(),
         )
-        .field(EmbedFieldBuilder::new(format!("@{}", config.twitter_handle), banner).inline())
+        .field(EmbedFieldBuilder::new(format!("@{}", config.twitter_handle), twitter).inline())
         .field(
             EmbedFieldBuilder::new(
                 "Role ping",

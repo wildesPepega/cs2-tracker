@@ -26,14 +26,16 @@ pub enum Event {
     Depots,
     News,
     Banner,
+    Avatar,
 }
 
-const EVENTS: [(&str, Event); 5] = [
+const EVENTS: [(&str, Event); 6] = [
     ("update", Event::Update),
     ("changelist", Event::Changelist),
     ("depots", Event::Depots),
     ("news", Event::News),
     ("banner", Event::Banner),
+    ("avatar", Event::Avatar),
 ];
 
 /// Which client the bot pretends to be, deciding the platform icon next to
@@ -128,7 +130,7 @@ fn events(list: &str) -> Result<Vec<Event>> {
                 .find(|(n, _)| *n == name)
                 .map(|&(_, e)| e)
                 .with_context(|| {
-                    format!("PING_EVENTS: unknown event {name:?}, use update, changelist, depots, news, banner, all or none")
+                    format!("PING_EVENTS: unknown event {name:?}, use update, changelist, depots, news, banner, avatar, all or none")
                 })
         })
         .collect()
@@ -145,7 +147,7 @@ mod tests {
             events(" Banner , depots ").unwrap(),
             [Event::Banner, Event::Depots]
         );
-        assert_eq!(events("all").unwrap().len(), 5);
+        assert_eq!(events("all").unwrap().len(), 6);
         assert!(events("none").unwrap().is_empty());
         assert!(events("updates").is_err());
     }
