@@ -50,12 +50,22 @@
         },
         {
             "name": "Ping Role (optional)",
-            "description": "Role ID pinged when a new public CS2 build goes live. Leave empty for no ping.",
+            "description": "Role ID to ping (right-click the role -> Copy Role ID, not the @mention). Which posts ping it is set with Ping Events. Leave empty for no ping.",
             "env_variable": "PING_ROLE_ID",
             "default_value": "",
             "user_viewable": true,
             "user_editable": true,
             "rules": "nullable|numeric|digits_between:17,20",
+            "field_type": "text"
+        },
+        {
+            "name": "Ping Events",
+            "description": "Comma-separated posts that ping the role: update (new public build), changelist, depots, news (blog posts / patch notes), banner. Or all / none.",
+            "env_variable": "PING_EVENTS",
+            "default_value": "update,news",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:64",
             "field_type": "text"
         },
         {

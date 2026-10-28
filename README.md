@@ -6,7 +6,7 @@ A Discord bot written in Rust that watches Counter-Strike 2 and posts every chan
 
 | Source | What | Interval |
 |---|---|---|
-| Steam PICS (the same data SteamDB uses) | Changelists for **730** (CS2), **2275500** (DevClient) and **2275530** (DevServer). A new build on the `public` branch gets its own update embed with an optional role ping. | 2 s |
+| Steam PICS (the same data SteamDB uses) | Changelists for **730** (CS2), **2275500** (DevClient) and **2275530** (DevServer). A new build on the `public` branch gets its own update embed. | 2 s |
 | Steam PICS | Depot changes: new, removed and changed depots, including new manifests per branch and size deltas. | with every changelist |
 | Steam News API | Official CS2 patch notes and blog posts | 20 s |
 | FxTwitter API | Banner changes of [@CounterStrike](https://x.com/CounterStrike) | 60 s |
@@ -22,7 +22,7 @@ The bot logs in to Steam anonymously, so you don't need a Steam account. For the
 ## Setup
 
 1. Create an application with a bot in the [Discord Developer Portal](https://discord.com/developers/applications) and copy the token. No privileged intents are needed.
-2. Invite the bot (scopes `bot` and `applications.commands`, permissions *View Channel*, *Send Messages* and *Embed Links*). For role pings, make the role mentionable or grant *Mention Everyone*.
+2. Invite the bot (scopes `bot` and `applications.commands`, permissions *View Channel*, *Send Messages* and *Embed Links*). For role pings, make the role mentionable or grant *Mention Everyone*. On startup the bot logs which role it pings and warns if it isn't mentionable.
 3. Run `cp .env.example .env` and fill in the values.
 4. Run it, either with a static binary from the [releases](https://github.com/wildesPepega/cs2-tracker/releases) (Linux x86_64/aarch64):
 
@@ -48,7 +48,8 @@ All settings are environment variables (a `.env` file is loaded automatically).
 |---|---|---|
 | `DISCORD_TOKEN` | – | Bot token (required) |
 | `DISCORD_CHANNEL_ID` | – | Channel to post into (required) |
-| `PING_ROLE_ID` | – | Role pinged on new public builds |
+| `PING_ROLE_ID` | – | Role to ping (the role's ID, not its @mention) |
+| `PING_EVENTS` | `update,news` | Posts that ping the role: `update` (new public build), `changelist`, `depots`, `news`, `banner`, or `all` / `none` |
 | `PICS_INTERVAL_MS` | `2000` | Steam changelist polling interval |
 | `NEWS_INTERVAL_SECS` | `20` | Steam News polling interval |
 | `TWITTER_INTERVAL_SECS` | `60` | Twitter banner polling interval |

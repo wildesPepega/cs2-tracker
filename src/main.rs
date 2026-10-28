@@ -60,6 +60,7 @@ async fn main() -> Result<()> {
         &config.discord_token,
         config.channel_id,
         config.ping_role_id,
+        config.ping_events.clone(),
     );
     let channel = discord.check().await?;
     info!("Posting to {channel}");

@@ -206,6 +206,18 @@ fn status_embed(
             .inline(),
         )
         .field(EmbedFieldBuilder::new(format!("@{}", config.twitter_handle), banner).inline())
+        .field(
+            EmbedFieldBuilder::new(
+                "Role ping",
+                match config.ping_role_id {
+                    Some(role) if !config.ping_events.is_empty() => {
+                        format!("<@&{role}> on {:?}", config.ping_events)
+                    }
+                    _ => "off".into(),
+                },
+            )
+            .inline(),
+        )
         .footer(EmbedFooterBuilder::new(format!(
             "Presence platform: {:?}",
             config.presence_platform

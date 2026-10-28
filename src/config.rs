@@ -4,8 +4,9 @@ use std::{env, path::PathBuf, time::Duration};
 pub struct Config {
     pub discord_token: String,
     pub channel_id: u64,
-    /// Role pinged when a new public CS2 build goes live.
     pub ping_role_id: Option<u64>,
+    /// Which posts ping the role.
+    pub ping_events: Vec<Event>,
     pub state_file: PathBuf,
     pub pics_interval: Duration,
     pub news_interval: Duration,
@@ -16,6 +17,24 @@ pub struct Config {
     pub auto_update: bool,
     pub update_interval: Duration,
 }
+
+/// Kinds of posts, used to decide which ones ping the role.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Event {
+    Update,
+    Changelist,
+    Depots,
+    News,
+    Banner,
+}
+
+const EVENTS: [(&str, Event); 5] = [
+    ("update", Event::Update),
+    ("changelist", Event::Changelist),
+    ("depots", Event::Depots),
+    ("news", Event::News),
+    ("banner", Event::Banner),
+];
 
 /// Which client the bot pretends to be, deciding the platform icon next to
 /// its online status.
@@ -35,6 +54,7 @@ impl Config {
                 .parse()
                 .context("DISCORD_CHANNEL_ID is not a valid ID")?,
             ping_role_id: number("PING_ROLE_ID")?,
+            ping_events: events(non_empty("PING_EVENTS").as_deref().unwrap_or("update,news"))?,
             state_file: env::var("STATE_FILE")
                 .unwrap_or_else(|_| "state.json".into())
                 .into(),
@@ -90,4 +110,43 @@ fn platform() -> Result<Platform> {
             other => bail!("PRESENCE_PLATFORM must be vr, mobile or desktop, not {other:?}"),
         },
     )
+}
+
+/// Parses a comma-separated list like `update,news`, or `all` / `none`.
+fn events(list: &str) -> Result<Vec<Event>> {
+    match list.trim().to_ascii_lowercase().as_str() {
+        "all" => return Ok(EVENTS.iter().map(|&(_, e)| e).collect()),
+        "none" => return Ok(Vec::new()),
+        _ => {}
+    }
+    list.split(',')
+        .map(|name| name.trim().to_ascii_lowercase())
+        .filter(|name| !name.is_empty())
+        .map(|name| {
+            EVENTS
+                .iter()
+                .find(|(n, _)| *n == name)
+                .map(|&(_, e)| e)
+                .with_context(|| {
+                    format!("PING_EVENTS: unknown event {name:?}, use update, changelist, depots, news, banner, all or none")
+                })
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_ping_events() {
+        assert_eq!(events("update,news").unwrap(), [Event::Update, Event::News]);
+        assert_eq!(
+            events(" Banner , depots ").unwrap(),
+            [Event::Banner, Event::Depots]
+        );
+        assert_eq!(events("all").unwrap().len(), 5);
+        assert!(events("none").unwrap().is_empty());
+        assert!(events("updates").is_err());
+    }
 }

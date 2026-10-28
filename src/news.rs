@@ -3,6 +3,7 @@
 
 use crate::{
     Ctx,
+    config::Event,
     discord::{CS2_ICON, CS2_IMAGE, base_embed, image, timestamp, truncate},
 };
 use anyhow::Result;
@@ -81,7 +82,7 @@ async fn check(ctx: &Ctx) -> Result<()> {
 
     for item in items.iter().filter(|i| !seen.contains(&i.gid)) {
         info!("New CS2 post: {}", item.title);
-        ctx.discord.send(news_embed(item), false).await?;
+        ctx.discord.send(news_embed(item), Event::News).await?;
         ctx.store.update(|s| s.mark_news_seen(&item.gid)).await;
     }
     Ok(())

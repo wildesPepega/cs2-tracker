@@ -2,6 +2,7 @@
 
 use crate::{
     Ctx,
+    config::Event,
     discord::{CS2_ICON, base_embed, image, timestamp},
 };
 use anyhow::Result;
@@ -58,7 +59,7 @@ async fn check(ctx: &Ctx) -> Result<()> {
         Some(old) if old != banner => {
             info!("New Twitter banner: {banner}");
             let embed = banner_embed(handle, Some(&old), &banner, user.avatar_url.as_deref());
-            ctx.discord.send(embed, false).await?;
+            ctx.discord.send(embed, Event::Banner).await?;
         }
         Some(_) => return Ok(()),
     }

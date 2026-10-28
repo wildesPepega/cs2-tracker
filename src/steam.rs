@@ -3,6 +3,7 @@
 
 use crate::{
     Ctx,
+    config::Event,
     depots::{depot_changes, depot_embed, is_depot_key},
     discord::{CS2_ICON, CS2_IMAGE, base_embed, image, timestamp, truncate},
     state::AppState,
@@ -180,7 +181,10 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
 
     if let Some(public) = builds.iter().find(|b| b.branch == "public") {
         ctx.discord
-            .send(update_embed(appid, public, new.change_number), true)
+            .send(
+                update_embed(appid, public, new.change_number),
+                Event::Update,
+            )
             .await?;
     }
     let embed = changelist_embed(
@@ -191,7 +195,7 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
         &diff,
         !depots.is_empty(),
     );
-    ctx.discord.send(embed, false).await?;
+    ctx.discord.send(embed, Event::Changelist).await?;
     if !depots.is_empty() {
         let embed = depot_embed(
             app_name(appid),
@@ -200,7 +204,7 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
             &depots,
             &new.info,
         );
-        ctx.discord.send(embed, false).await?;
+        ctx.discord.send(embed, Event::Depots).await?;
     }
     Ok(())
 }
@@ -499,7 +503,7 @@ mod tests {
         // update + changelist + depots for 730, changelist for the dev app
         assert_eq!(embeds.len(), 4);
         for embed in embeds {
-            embed.validate().expect("embed within Discord limits");
+            let _ = embed.validate().expect("embed within Discord limits");
         }
     }
 

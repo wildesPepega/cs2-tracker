@@ -1,4 +1,6 @@
+use crate::config::Event;
 use anyhow::Result;
+use tracing::{info, warn};
 use twilight_http::Client;
 use twilight_model::{
     channel::message::AllowedMentions,
@@ -19,14 +21,21 @@ pub struct Discord {
     http: Client,
     channel: Id<ChannelMarker>,
     ping_role: Option<Id<RoleMarker>>,
+    ping_events: Vec<Event>,
 }
 
 impl Discord {
-    pub fn new(token: &str, channel_id: u64, ping_role_id: Option<u64>) -> Self {
+    pub fn new(
+        token: &str,
+        channel_id: u64,
+        ping_role_id: Option<u64>,
+        ping_events: Vec<Event>,
+    ) -> Self {
         Self {
             http: Client::new(token.to_owned()),
             channel: Id::new(channel_id),
             ping_role: ping_role_id.map(Id::new),
+            ping_events,
         }
     }
 
@@ -37,15 +46,32 @@ impl Discord {
     /// Fails fast at startup if the token or channel is wrong.
     pub async fn check(&self) -> Result<String> {
         let channel = self.http.channel(self.channel).await?.model().await?;
+        if let (Some(role), Some(guild)) = (self.ping_role, channel.guild_id) {
+            let roles = self.http.roles(guild).await?.models().await?;
+            match roles.iter().find(|r| r.id == role) {
+                None => {
+                    warn!("PING_ROLE_ID {role} is not a role on this server, nobody will be pinged")
+                }
+                Some(r) => {
+                    info!("Pinging @{} on {:?}", r.name, self.ping_events);
+                    if !r.mentionable {
+                        warn!(
+                            "@{} is not mentionable. Pings only work if the bot has the Mention Everyone permission",
+                            r.name
+                        );
+                    }
+                }
+            }
+        }
         Ok(channel
             .name
             .map(|n| format!("#{n}"))
             .unwrap_or_else(|| self.channel.to_string()))
     }
 
-    pub async fn send(&self, embed: EmbedBuilder, ping: bool) -> Result<()> {
+    pub async fn send(&self, embed: EmbedBuilder, event: Event) -> Result<()> {
         let embeds = [embed.build()];
-        let role = self.ping_role.filter(|_| ping);
+        let role = self.ping_role.filter(|_| self.ping_events.contains(&event));
         let mentions = AllowedMentions {
             roles: role.into_iter().collect(),
             ..Default::default()
