@@ -16,7 +16,7 @@ use tsclientlib::{
 };
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
-/// Short chime bundled with the binary, used unless `TS_SOUND_FILE` is set.
+/// CS2 update sound bundled with the binary, used unless `TS_SOUND_FILE` is set.
 const DEFAULT_SOUND: &[u8] = include_bytes!("../assets/update.opus");
 /// Security level most servers require for new clients.
 const IDENTITY_LEVEL: u8 = 8;
@@ -335,7 +335,7 @@ mod tests {
     fn bundled_sound_is_valid_opus() {
         let packets = load_sound(None).unwrap();
         let total: Duration = packets.iter().map(|p| packet_duration(p)).sum();
-        assert!(total > Duration::from_secs(1) && total < Duration::from_secs(3));
+        assert!(total > Duration::from_secs(10) && total < Duration::from_secs(16));
         assert!(
             packets.iter().all(|p| p.len() < 1200),
             "packets fit a UDP datagram"

@@ -210,7 +210,7 @@
         },
         {
             "name": "TeamSpeak Sound File",
-            "description": "Own sound as Ogg Opus file in the server folder (e.g. sound.opus). Empty = bundled chime.",
+            "description": "Own sound as Ogg Opus file in the server folder (e.g. sound.opus). Empty = bundled CS2 update sound.",
             "env_variable": "TS_SOUND_FILE",
             "default_value": "",
             "user_viewable": true,

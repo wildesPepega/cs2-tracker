@@ -66,7 +66,7 @@ All settings are environment variables (a `.env` file is loaded automatically).
 | `TS_SERVER_PASSWORD` | – | Server password |
 | `TS_NICKNAME` | `CS2 Tracker` | Nickname in TeamSpeak |
 | `TS_EVENTS` | `update` | Posts that play the sound, same names as `PING_EVENTS` |
-| `TS_SOUND_FILE` | bundled chime | Your own sound as an Ogg Opus file (see [TeamSpeak](#teamspeak)) |
+| `TS_SOUND_FILE` | bundled CS2 update sound | Your own sound as an Ogg Opus file (see [TeamSpeak](#teamspeak)) |
 
 ## Commands
 
@@ -81,7 +81,7 @@ but the bot still refuses anyone without the *Administrator* permission.
 
 ## TeamSpeak
 
-Set `TS_ADDRESS` and the bot also joins a TeamSpeak server. It sits in `TS_CHANNEL` and plays a short chime whenever a
+Set `TS_ADDRESS` and the bot also joins a TeamSpeak server. It sits in `TS_CHANNEL` and plays the CS2 update sound whenever a
 new public CS2 build is detected (`TS_EVENTS=update`). Use `/soundtest` to hear it. It works with TS3 and TS6 servers
 and reconnects on its own if the connection drops.
 
