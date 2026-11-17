@@ -67,7 +67,8 @@ All settings are environment variables (a `.env` file is loaded automatically).
 | `TS_SERVER_PASSWORD` | – | Server password |
 | `TS_NICKNAME` | `CS2 Tracker` | Nickname in TeamSpeak |
 | `TS_EVENTS` | `update` | Posts that play the sound, same names as `PING_EVENTS` |
-| `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | – | X API credentials. Enable posting to X (see [Posting to X](#posting-to-x)). |
+| `X_AUTH_TOKEN`, `X_CT0` | – | Cookies of the X account. Enable free posting to X (see [Posting to X](#posting-to-x)). |
+| `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | – | X API credentials. Enable paid posting to X instead. |
 | `X_EVENTS` | `update,dev,banner,avatar` | Events that get posted to X, same names as `PING_EVENTS` |
 | `TS_SOUND_FILE` | bundled CS2 update sound | Your own sound as an Ogg Opus file (see [TeamSpeak](#teamspeak)) |
 
@@ -101,7 +102,7 @@ and reconnects on its own if the connection drops.
 
 ## Posting to X
 
-With X API credentials the bot also posts to an X account:
+The bot can also post to an X account:
 
 | Event | Post |
 |---|---|
@@ -110,19 +111,34 @@ With X API credentials the bot also posts to an X account:
 | `banner` | 🖼️ @CounterStrike has a new banner! with the banner attached |
 | `avatar` | 👤 @CounterStrike has a new profile picture! with the picture attached |
 
-Posts never contain links, because X charges a lot more for those. Failed posts are logged and not retried, so
-nothing is posted twice.
+Posts never contain links. Failed posts are logged and not retried, so nothing is posted twice.
 
-Setup:
+There are two ways to log in. If both are set, the cookies win.
+
+### Free: account cookies
+
+The bot posts the way x.com does in the browser, with the account's session cookies. This costs nothing.
+
+> **Warning:** this breaks X's rules (no automation of the website). X may lock or suspend the account, and it can
+> stop working whenever X changes its website. Use an account you can afford to lose.
+
+1. Log in to x.com in a browser with the account that should post.
+2. Open the developer tools (F12) → *Application* / *Storage* → *Cookies* → `https://x.com`.
+3. Copy the values of `auth_token` and `ct0` into `X_AUTH_TOKEN` and `X_CT0`. Treat them like a password.
+4. On startup the bot logs `Posting to X as @<account> (cookies)`.
+
+The cookies stay valid until you log out of that browser session. Logging out invalidates them.
+
+### Paid: X API
 
 1. Create a project and app in the [X Developer Console](https://console.x.com) and add credits. Posting is paid
-   (pay-per-use, roughly $0.015 per post as of 2026). DevClient/DevServer changelists can come in several times a day,
-   so leave `dev` out of `X_EVENTS` if that gets too expensive.
+   (pay-per-use, roughly $0.015 per post as of 2026, a lot more with links). DevClient/DevServer changelists can come
+   in several times a day, so leave `dev` out of `X_EVENTS` if that gets too expensive.
 2. Under *User authentication settings*, set the app permissions to **Read and write**.
 3. Copy the *API Key* and *API Key Secret*. Then generate the *Access Token* and *Access Token Secret* for the
    account that should post. Generate them after setting *Read and write*, or they stay read-only.
 4. Set `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN` and `X_ACCESS_SECRET`. On startup the bot logs
-   `Posting to X as @<account>`.
+   `Posting to X as @<account> (API)`.
 
 ## Presence
 

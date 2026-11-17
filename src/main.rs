@@ -11,6 +11,7 @@ mod twitter;
 mod updater;
 mod vdf;
 mod x;
+mod x_web;
 
 use anyhow::{Context, Result};
 use config::{Config, Event};

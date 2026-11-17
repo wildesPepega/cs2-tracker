@@ -22,14 +22,24 @@ pub struct Config {
     pub x: Option<XConfig>,
 }
 
-/// X API app keys plus the access token of the account that posts.
 pub struct XConfig {
+    pub auth: XAuth,
+    /// Which events get posted.
+    pub events: Vec<Event>,
+}
+
+pub enum XAuth {
+    /// Paid X API: app keys plus the access token of the account that posts.
+    Api(ApiKeys),
+    /// Free: the account's browser cookies, used like x.com's web client.
+    Cookies { auth_token: String, ct0: String },
+}
+
+pub struct ApiKeys {
     pub api_key: String,
     pub api_secret: String,
     pub access_token: String,
     pub access_secret: String,
-    /// Which events get posted.
-    pub events: Vec<Event>,
 }
 
 pub struct TeamSpeakConfig {
@@ -122,6 +132,21 @@ impl Config {
 }
 
 fn x() -> Result<Option<XConfig>> {
+    let Some(auth) = x_auth()? else {
+        return Ok(None);
+    };
+    Ok(Some(XConfig {
+        auth,
+        events: events("X_EVENTS", "update,dev,banner,avatar")?,
+    }))
+}
+
+fn x_auth() -> Result<Option<XAuth>> {
+    match (non_empty("X_AUTH_TOKEN"), non_empty("X_CT0")) {
+        (Some(auth_token), Some(ct0)) => return Ok(Some(XAuth::Cookies { auth_token, ct0 })),
+        (None, None) => {}
+        _ => bail!("X cookie login needs both X_AUTH_TOKEN and X_CT0"),
+    }
     let keys = [
         "X_API_KEY",
         "X_API_SECRET",
@@ -140,18 +165,17 @@ fn x() -> Result<Option<XConfig>> {
         .collect();
     if !missing.is_empty() {
         bail!(
-            "X posting needs all four keys, missing {}",
+            "X API posting needs all four keys, missing {}",
             missing.join(", ")
         );
     }
     let [api_key, api_secret, access_token, access_secret] = values.map(Option::unwrap_or_default);
-    Ok(Some(XConfig {
+    Ok(Some(XAuth::Api(ApiKeys {
         api_key,
         api_secret,
         access_token,
         access_secret,
-        events: events("X_EVENTS", "update,dev,banner,avatar")?,
-    }))
+    })))
 }
 
 fn non_empty(key: &str) -> Option<String> {

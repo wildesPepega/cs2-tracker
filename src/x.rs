@@ -1,8 +1,12 @@
-//! Optional auto-posting to X/Twitter through the X API v2, signed with
-//! OAuth 1.0a user context. Posts never contain links, because X charges
-//! much more for posts with URLs.
+//! Optional auto-posting to X/Twitter, either through the paid X API v2
+//! (signed with OAuth 1.0a user context) or for free through x.com's web
+//! client with the account's cookies (see [`crate::x_web`]). Posts never
+//! contain links, because the API charges much more for posts with URLs.
 
-use crate::config::{Event, XConfig};
+use crate::{
+    config::{ApiKeys, Event, XAuth, XConfig},
+    x_web::XWeb,
+};
 use anyhow::{Context, Result, bail};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use hmac::{Hmac, Mac};
@@ -22,7 +26,14 @@ const API: &str = "https://api.x.com/2";
 
 pub struct X {
     http: reqwest::Client,
-    config: Arc<XConfig>,
+    backend: Backend,
+    events: Vec<Event>,
+}
+
+#[derive(Clone)]
+enum Backend {
+    Api(Arc<ApiKeys>),
+    Web(Arc<XWeb>),
 }
 
 #[derive(Deserialize)]
@@ -42,35 +53,58 @@ struct Id {
 
 impl X {
     pub fn new(http: reqwest::Client, config: XConfig) -> Self {
+        let backend = match config.auth {
+            XAuth::Api(keys) => Backend::Api(Arc::new(keys)),
+            XAuth::Cookies { auth_token, ct0 } => {
+                Backend::Web(Arc::new(XWeb::new(http.clone(), auth_token, ct0)))
+            }
+        };
         Self {
             http,
-            config: Arc::new(config),
+            backend,
+            events: config.events,
         }
     }
 
     pub fn events(&self) -> &[Event] {
-        &self.config.events
+        &self.events
+    }
+
+    pub fn mode(&self) -> &'static str {
+        match self.backend {
+            Backend::Api(_) => "API",
+            Backend::Web(_) => "cookies",
+        }
     }
 
     /// Logs which account posts go to, so wrong keys show up at startup.
     pub async fn check(&self) {
-        let url = format!("{API}/users/me");
-        let result = async {
-            let me: Data<Me> = self
-                .http
-                .get(&url)
-                .header("Authorization", self.config.authorization("GET", &url))
-                .send()
-                .await?
-                .error_for_status()?
-                .json()
-                .await?;
-            anyhow::Ok(me.data.username)
-        }
-        .await;
+        let result = match &self.backend {
+            Backend::Api(keys) => {
+                let url = format!("{API}/users/me");
+                async {
+                    let me: Data<Me> = self
+                        .http
+                        .get(&url)
+                        .header("Authorization", keys.authorization("GET", &url))
+                        .send()
+                        .await?
+                        .error_for_status()?
+                        .json()
+                        .await?;
+                    anyhow::Ok(me.data.username)
+                }
+                .await
+            }
+            Backend::Web(web) => web.check().await,
+        };
         match result {
-            Ok(user) => info!("Posting to X as @{user} on {:?}", self.config.events),
-            Err(e) => warn!("X credentials check failed: {e:#}"),
+            Ok(user) => info!(
+                "Posting to X as @{user} ({}) on {:?}",
+                self.mode(),
+                self.events
+            ),
+            Err(e) => warn!("X login check failed: {e:#}"),
         }
     }
 
@@ -78,13 +112,29 @@ impl X {
     /// `event` is one of `X_EVENTS`. Failures are logged, never retried, so
     /// nothing gets posted twice.
     pub fn post(&self, event: Event, text: String, image_url: Option<String>) {
-        if !self.config.events.contains(&event) {
+        if !self.events.contains(&event) {
             return;
         }
         let http = self.http.clone();
-        let config = self.config.clone();
+        let backend = self.backend.clone();
         tokio::spawn(async move {
-            match post(&http, &config, &text, image_url.as_deref()).await {
+            let result = match backend {
+                Backend::Api(keys) => post(&http, &keys, &text, image_url.as_deref()).await,
+                Backend::Web(web) => {
+                    let image = match image_url {
+                        Some(url) => match download(&http, &url).await {
+                            Ok(image) => Some(image),
+                            Err(e) => {
+                                warn!("Cannot download image for X, posting without it: {e:#}");
+                                None
+                            }
+                        },
+                        None => None,
+                    };
+                    web.post(&text, image).await
+                }
+            };
+            match result {
                 Ok(id) => info!("Posted to X: {id}"),
                 Err(e) => warn!("Posting to X failed: {e:#}"),
             }
@@ -92,9 +142,21 @@ impl X {
     }
 }
 
+/// Downloads an image and its MIME type.
+async fn download(http: &reqwest::Client, url: &str) -> Result<(Vec<u8>, String)> {
+    let resp = http.get(url).send().await?.error_for_status()?;
+    let mime = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("image/jpeg")
+        .to_owned();
+    Ok((resp.bytes().await?.to_vec(), mime))
+}
+
 async fn post(
     http: &reqwest::Client,
-    config: &XConfig,
+    config: &ApiKeys,
     text: &str,
     image_url: Option<&str>,
 ) -> Result<String> {
@@ -123,7 +185,7 @@ async fn post(
     Ok(created.data.id)
 }
 
-async fn upload_image(http: &reqwest::Client, config: &XConfig, image_url: &str) -> Result<String> {
+async fn upload_image(http: &reqwest::Client, config: &ApiKeys, image_url: &str) -> Result<String> {
     let bytes = http
         .get(image_url)
         .send()
@@ -157,7 +219,7 @@ async fn ok_json<T: serde::de::DeserializeOwned>(resp: reqwest::Response) -> Res
     serde_json::from_str(&text).with_context(|| format!("unexpected X API response: {text}"))
 }
 
-impl XConfig {
+impl ApiKeys {
     fn authorization(&self, method: &str, url: &str) -> String {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let now = SystemTime::now()
@@ -242,12 +304,11 @@ mod tests {
     /// The example from X's "Creating a signature" docs.
     #[test]
     fn signs_like_the_docs() {
-        let config = XConfig {
+        let config = ApiKeys {
             api_key: "xvz1evFS4wEEPTGEFPHBog".into(),
             api_secret: "kAcSOqF21Fu85e7zjz7ZN2U4ZRhfV3WpwPAoE3Z7kBw".into(),
             access_token: "370773112-GmHxMAgYyLbNEtIKZeRNFsMKPR9EyMZeS9weJAEb".into(),
             access_secret: "LswwdoUaIvS8ltyTt5jkRh4J50vUPVVHtR2YPi5kE".into(),
-            events: Vec::new(),
         };
         let header = config.sign(
             "POST",

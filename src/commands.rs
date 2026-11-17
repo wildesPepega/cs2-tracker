@@ -302,9 +302,9 @@ fn status_embed(
         .field(
             EmbedFieldBuilder::new(
                 "X posts",
-                ctx.x
-                    .as_ref()
-                    .map_or("off".into(), |x| format!("on {:?}", x.events())),
+                ctx.x.as_ref().map_or("off".into(), |x| {
+                    format!("{} · on {:?}", x.mode(), x.events())
+                }),
             )
             .inline(),
         )

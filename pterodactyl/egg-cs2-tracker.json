@@ -4,7 +4,7 @@
         "version": "PTDL_v2",
         "update_url": "https://raw.githubusercontent.com/wildesPepega/cs2-tracker/main/pterodactyl/egg-cs2-tracker.json"
     },
-    "exported_at": "2026-11-17T23:00:00+01:00",
+    "exported_at": "2026-11-18T00:30:00+01:00",
     "name": "CS2 Tracker",
     "author": "wildesPepega@users.noreply.github.com",
     "description": "Discord bot that watches Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) via Steam PICS for changelists, builds and depot changes, and posts CS2 blog posts and @CounterStrike Twitter banner and profile picture changes. Can post to X/Twitter and play a sound in a TeamSpeak 3/6 channel on game updates. Updates itself automatically.",
@@ -219,8 +219,28 @@
             "field_type": "text"
         },
         {
-            "name": "X API Key (optional)",
-            "description": "API Key (Consumer Key) of your X developer app. All four X keys are needed to post to X; leave all empty to disable.",
+            "name": "X Cookie auth_token (optional)",
+            "description": "Free X posting: value of the auth_token cookie of the logged-in X account (browser dev tools -> Cookies -> x.com). Breaks X's rules, the account may get locked. Needs X Cookie ct0 too.",
+            "env_variable": "X_AUTH_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "X Cookie ct0",
+            "description": "Free X posting: value of the ct0 cookie of the same browser session.",
+            "env_variable": "X_CT0",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "X API Key (optional, paid)",
+            "description": "Paid X posting: API Key (Consumer Key) of your X developer app. Needs all four X API fields. Ignored when the cookies are set.",
             "env_variable": "X_API_KEY",
             "default_value": "",
             "user_viewable": true,
