@@ -521,17 +521,20 @@ dependencies = [
 
 [[package]]
 name = "cs2-tracker"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "dotenvy",
  "futures",
+ "hmac",
  "ogg",
  "regex",
  "reqwest",
  "rustls",
  "serde",
  "serde_json",
+ "sha1",
  "steam-vent",
  "steam-vent-proto",
  "tokio",

@@ -69,6 +69,11 @@ async fn check_banner(ctx: &Ctx, banner: String, avatar: Option<&str>) -> Result
             info!("New Twitter banner: {banner}");
             let embed = banner_embed(handle, Some(&old), &banner, avatar);
             ctx.post(embed, Event::Banner).await?;
+            ctx.tweet(
+                Event::Banner,
+                format!("🖼️ @{handle} has a new banner!\n\n#CS2 #CounterStrike2"),
+                Some(format!("{banner}/1500x500")),
+            );
         }
         Some(_) => return Ok(()),
     }
@@ -85,6 +90,11 @@ async fn check_avatar(ctx: &Ctx, avatar: String) -> Result<()> {
             info!("New Twitter profile picture: {avatar}");
             let embed = avatar_embed(handle, Some(&old), &avatar);
             ctx.post(embed, Event::Avatar).await?;
+            ctx.tweet(
+                Event::Avatar,
+                format!("👤 @{handle} has a new profile picture!\n\n#CS2 #CounterStrike2"),
+                Some(avatar.clone()),
+            );
         }
         Some(_) => return Ok(()),
     }

@@ -299,6 +299,15 @@ fn status_embed(
             )
             .inline(),
         )
+        .field(
+            EmbedFieldBuilder::new(
+                "X posts",
+                ctx.x
+                    .as_ref()
+                    .map_or("off".into(), |x| format!("on {:?}", x.events())),
+            )
+            .inline(),
+        )
         .footer(EmbedFooterBuilder::new(format!(
             "Presence platform: {:?}",
             config.presence_platform

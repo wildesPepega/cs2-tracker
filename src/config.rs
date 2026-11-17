@@ -18,6 +18,18 @@ pub struct Config {
     pub update_interval: Duration,
     /// Set when `TS_ADDRESS` is.
     pub teamspeak: Option<TeamSpeakConfig>,
+    /// Set when all four X API credentials are.
+    pub x: Option<XConfig>,
+}
+
+/// X API app keys plus the access token of the account that posts.
+pub struct XConfig {
+    pub api_key: String,
+    pub api_secret: String,
+    pub access_token: String,
+    pub access_secret: String,
+    /// Which events get posted.
+    pub events: Vec<Event>,
 }
 
 pub struct TeamSpeakConfig {
@@ -39,15 +51,18 @@ pub struct TeamSpeakConfig {
 pub enum Event {
     Update,
     Changelist,
+    /// A changelist of the DevClient or DevServer app.
+    Dev,
     Depots,
     News,
     Banner,
     Avatar,
 }
 
-const EVENTS: [(&str, Event); 6] = [
+const EVENTS: [(&str, Event); 7] = [
     ("update", Event::Update),
     ("changelist", Event::Changelist),
+    ("dev", Event::Dev),
     ("depots", Event::Depots),
     ("news", Event::News),
     ("banner", Event::Banner),
@@ -101,8 +116,42 @@ impl Config {
                     })
                 })
                 .transpose()?,
+            x: x()?,
         })
     }
+}
+
+fn x() -> Result<Option<XConfig>> {
+    let keys = [
+        "X_API_KEY",
+        "X_API_SECRET",
+        "X_ACCESS_TOKEN",
+        "X_ACCESS_SECRET",
+    ];
+    let values = keys.map(non_empty);
+    if values.iter().all(Option::is_none) {
+        return Ok(None);
+    }
+    let missing: Vec<_> = keys
+        .iter()
+        .zip(&values)
+        .filter(|(_, v)| v.is_none())
+        .map(|(k, _)| *k)
+        .collect();
+    if !missing.is_empty() {
+        bail!(
+            "X posting needs all four keys, missing {}",
+            missing.join(", ")
+        );
+    }
+    let [api_key, api_secret, access_token, access_secret] = values.map(Option::unwrap_or_default);
+    Ok(Some(XConfig {
+        api_key,
+        api_secret,
+        access_token,
+        access_secret,
+        events: events("X_EVENTS", "update,dev,banner,avatar")?,
+    }))
 }
 
 fn non_empty(key: &str) -> Option<String> {
@@ -164,7 +213,7 @@ fn parse_events(list: &str) -> Result<Vec<Event>> {
                 .find(|(n, _)| *n == name)
                 .map(|&(_, e)| e)
                 .with_context(|| {
-                    format!("unknown event {name:?}, use update, changelist, depots, news, banner, avatar, all or none")
+                    format!("unknown event {name:?}, use update, changelist, dev, depots, news, banner, avatar, all or none")
                 })
         })
         .collect()
@@ -184,7 +233,7 @@ mod tests {
             parse_events(" Banner , depots ").unwrap(),
             [Event::Banner, Event::Depots]
         );
-        assert_eq!(parse_events("all").unwrap().len(), 6);
+        assert_eq!(parse_events("all").unwrap().len(), 7);
         assert!(parse_events("none").unwrap().is_empty());
         assert!(parse_events("updates").is_err());
     }

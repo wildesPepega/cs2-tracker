@@ -15,6 +15,7 @@ It also:
 
 - **shows up as online** with a rotating set of 150+ CS-themed statuses ("Playing de_mirage", "Listening to the bomb beeps", …). By default it uses the VR platform icon (see [Presence](#presence)).
 - **updates itself.** It checks GitHub releases, swaps its own binary and restarts in place.
+- can **post to X/Twitter** on game updates, DevClient/DevServer updates and @CounterStrike banner and profile picture changes (see [Posting to X](#posting-to-x)).
 - can **play a sound in a TeamSpeak channel** (TS3 and TS6 servers) when a game update is detected (see [TeamSpeak](#teamspeak)).
 - has an admin-only **`/preview`** command that shows example embeds built from the live data (see [Commands](#commands)).
 
@@ -50,7 +51,7 @@ All settings are environment variables (a `.env` file is loaded automatically).
 | `DISCORD_TOKEN` | – | Bot token (required) |
 | `DISCORD_CHANNEL_ID` | – | Channel to post into (required) |
 | `PING_ROLE_ID` | – | Role to ping (the role's ID, not its @mention) |
-| `PING_EVENTS` | `update,news` | Posts that ping the role: `update` (new public build), `changelist`, `depots`, `news`, `banner`, `avatar` (profile picture), or `all` / `none` |
+| `PING_EVENTS` | `update,news` | Posts that ping the role: `update` (new public build), `changelist` (CS2), `dev` (DevClient/DevServer changelist), `depots`, `news`, `banner`, `avatar` (profile picture), or `all` / `none` |
 | `PICS_INTERVAL_MS` | `2000` | Steam changelist polling interval |
 | `NEWS_INTERVAL_SECS` | `20` | Steam News polling interval |
 | `TWITTER_INTERVAL_SECS` | `60` | Twitter banner / profile picture polling interval |
@@ -66,6 +67,8 @@ All settings are environment variables (a `.env` file is loaded automatically).
 | `TS_SERVER_PASSWORD` | – | Server password |
 | `TS_NICKNAME` | `CS2 Tracker` | Nickname in TeamSpeak |
 | `TS_EVENTS` | `update` | Posts that play the sound, same names as `PING_EVENTS` |
+| `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` | – | X API credentials. Enable posting to X (see [Posting to X](#posting-to-x)). |
+| `X_EVENTS` | `update,dev,banner,avatar` | Events that get posted to X, same names as `PING_EVENTS` |
 | `TS_SOUND_FILE` | bundled CS2 update sound | Your own sound as an Ogg Opus file (see [TeamSpeak](#teamspeak)) |
 
 ## Commands
@@ -95,6 +98,31 @@ and reconnects on its own if the connection drops.
   ```
 
   The bot plays the file as it is, so set the volume in the file (for example with `-af volume=0.5`).
+
+## Posting to X
+
+With X API credentials the bot also posts to an X account:
+
+| Event | Post |
+|---|---|
+| `update` | 🚨 Counter-Strike 2 has been updated! with the old and new build ID and the changelist |
+| `dev` | 🛠️ CS2 DevClient / CS2 DevServer has been updated with the changelist |
+| `banner` | 🖼️ @CounterStrike has a new banner! with the banner attached |
+| `avatar` | 👤 @CounterStrike has a new profile picture! with the picture attached |
+
+Posts never contain links, because X charges a lot more for those. Failed posts are logged and not retried, so
+nothing is posted twice.
+
+Setup:
+
+1. Create a project and app in the [X Developer Console](https://console.x.com) and add credits. Posting is paid
+   (pay-per-use, roughly $0.015 per post as of 2026). DevClient/DevServer changelists can come in several times a day,
+   so leave `dev` out of `X_EVENTS` if that gets too expensive.
+2. Under *User authentication settings*, set the app permissions to **Read and write**.
+3. Copy the *API Key* and *API Key Secret*. Then generate the *Access Token* and *Access Token Secret* for the
+   account that should post. Generate them after setting *Read and write*, or they stay read-only.
+4. Set `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN` and `X_ACCESS_SECRET`. On startup the bot logs
+   `Posting to X as @<account>`.
 
 ## Presence
 

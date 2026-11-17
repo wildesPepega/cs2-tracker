@@ -10,6 +10,7 @@ mod teamspeak;
 mod twitter;
 mod updater;
 mod vdf;
+mod x;
 
 use anyhow::{Context, Result};
 use config::{Config, Event};
@@ -30,6 +31,7 @@ pub struct Ctx {
     pub http: reqwest::Client,
     pub started_at: Instant,
     pub teamspeak: Option<TeamSpeak>,
+    pub x: Option<x::X>,
 }
 
 impl Ctx {
@@ -40,6 +42,13 @@ impl Ctx {
             ts.notify(event);
         }
         Ok(())
+    }
+
+    /// Posts to X if `event` is one of `X_EVENTS`.
+    pub fn tweet(&self, event: Event, text: String, image_url: Option<String>) {
+        if let Some(x) = &self.x {
+            x.post(event, text, image_url);
+        }
     }
 }
 
@@ -62,7 +71,7 @@ async fn main() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     info!("cs2-tracker v{}", updater::VERSION);
 
-    let config = Config::from_env()?;
+    let mut config = Config::from_env()?;
     let http = reqwest::Client::builder()
         .user_agent(concat!("cs2-tracker/", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(15))
@@ -92,6 +101,10 @@ async fn main() -> Result<()> {
         Some((handle, rx, sound)) => (Some(handle), Some((rx, sound))),
         None => (None, None),
     };
+    let x = config.x.take().map(|c| x::X::new(http.clone(), c));
+    if let Some(x) = &x {
+        x.check().await;
+    }
     let ctx = Arc::new(Ctx {
         store: Store::load(&config.state_file)?,
         http,
@@ -99,6 +112,7 @@ async fn main() -> Result<()> {
         config,
         started_at: Instant::now(),
         teamspeak,
+        x,
     });
     // Spawned so it can still disconnect cleanly after the select below.
     let ts_task = ts_task.map(|(rx, sound)| tokio::spawn(teamspeak::run(ctx.clone(), rx, sound)));

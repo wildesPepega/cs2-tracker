@@ -185,6 +185,11 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
             Event::Update,
         )
         .await?;
+        ctx.tweet(
+            Event::Update,
+            update_tweet(appid, public, new.change_number),
+            None,
+        );
     }
     let embed = changelist_embed(
         appid,
@@ -194,7 +199,15 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
         &diff,
         !depots.is_empty(),
     );
-    ctx.post(embed, Event::Changelist).await?;
+    let event = if appid == 730 {
+        Event::Changelist
+    } else {
+        Event::Dev
+    };
+    ctx.post(embed, event).await?;
+    if event == Event::Dev {
+        ctx.tweet(event, dev_tweet(appid, new.change_number), None);
+    }
     if !depots.is_empty() {
         let embed = depot_embed(
             app_name(appid),
@@ -206,6 +219,26 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
         ctx.post(embed, Event::Depots).await?;
     }
     Ok(())
+}
+
+const HASHTAGS: &str = "#CS2 #CounterStrike2";
+
+fn update_tweet(appid: u32, build: &BuildChange, change_number: u32) -> String {
+    let builds = match &build.old {
+        Some(old) => format!("Build ID: {old} → {}", build.new),
+        None => format!("Build ID: {}", build.new),
+    };
+    format!(
+        "🚨 {} has been updated!\n\n{builds}\nChangelist: #{change_number}\n\n{HASHTAGS}",
+        app_name(appid)
+    )
+}
+
+fn dev_tweet(appid: u32, change_number: u32) -> String {
+    format!(
+        "🛠️ {} has been updated\n\nChangelist: #{change_number}\n\n{HASHTAGS}",
+        app_name(appid)
+    )
 }
 
 pub struct BuildChange {
