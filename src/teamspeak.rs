@@ -335,7 +335,7 @@ mod tests {
     fn bundled_sound_is_valid_opus() {
         let packets = load_sound(None).unwrap();
         let total: Duration = packets.iter().map(|p| packet_duration(p)).sum();
-        assert!(total > Duration::from_secs(10) && total < Duration::from_secs(16));
+        assert!(total > Duration::from_secs(8) && total <= Duration::from_secs(10));
         assert!(
             packets.iter().all(|p| p.len() < 1200),
             "packets fit a UDP datagram"
