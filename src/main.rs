@@ -6,19 +6,22 @@ mod news;
 mod presence;
 mod state;
 mod steam;
+mod teamspeak;
 mod twitter;
 mod updater;
 mod vdf;
 
 use anyhow::{Context, Result};
-use config::Config;
+use config::{Config, Event};
 use discord::Discord;
 use state::Store;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tracing::info;
+use teamspeak::TeamSpeak;
+use tracing::{info, warn};
+use twilight_util::builder::embed::EmbedBuilder;
 
 pub struct Ctx {
     pub config: Config,
@@ -26,6 +29,18 @@ pub struct Ctx {
     pub store: Store,
     pub http: reqwest::Client,
     pub started_at: Instant,
+    pub teamspeak: Option<TeamSpeak>,
+}
+
+impl Ctx {
+    /// Posts to Discord and plays the TeamSpeak sound if `event` asks for it.
+    pub async fn post(&self, embed: EmbedBuilder, event: Event) -> Result<()> {
+        self.discord.send(embed, event).await?;
+        if let Some(ts) = &self.teamspeak {
+            ts.notify(event);
+        }
+        Ok(())
+    }
 }
 
 #[tokio::main]
@@ -65,13 +80,28 @@ async fn main() -> Result<()> {
     let channel = discord.check().await?;
     info!("Posting to {channel}");
 
+    let teamspeak = match &config.teamspeak {
+        Some(ts) => {
+            let sound = teamspeak::load_sound(ts.sound_file.as_deref())?;
+            let (handle, rx) = TeamSpeak::new(ts.events.clone());
+            Some((handle, rx, sound))
+        }
+        None => None,
+    };
+    let (teamspeak, ts_task) = match teamspeak {
+        Some((handle, rx, sound)) => (Some(handle), Some((rx, sound))),
+        None => (None, None),
+    };
     let ctx = Arc::new(Ctx {
         store: Store::load(&config.state_file)?,
         http,
         discord,
         config,
         started_at: Instant::now(),
+        teamspeak,
     });
+    // Spawned so it can still disconnect cleanly after the select below.
+    let ts_task = ts_task.map(|(rx, sound)| tokio::spawn(teamspeak::run(ctx.clone(), rx, sound)));
 
     tokio::select! {
         _ = steam::run(ctx.clone()) => {}
@@ -80,6 +110,15 @@ async fn main() -> Result<()> {
         _ = presence::run(ctx.clone()) => {}
         _ = updater::run(ctx.clone(), exe.clone()) => {}
         _ = shutdown_signal() => info!("Shutting down"),
+    }
+    if let (Some(ts), Some(task)) = (&ctx.teamspeak, ts_task) {
+        ts.quit().await;
+        if tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .is_err()
+        {
+            warn!("TeamSpeak did not disconnect in time");
+        }
     }
     if ctx.config.auto_update {
         updater::on_shutdown(&ctx.http, &exe).await;

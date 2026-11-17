@@ -68,7 +68,7 @@ async fn check_banner(ctx: &Ctx, banner: String, avatar: Option<&str>) -> Result
         Some(old) if old != banner => {
             info!("New Twitter banner: {banner}");
             let embed = banner_embed(handle, Some(&old), &banner, avatar);
-            ctx.discord.send(embed, Event::Banner).await?;
+            ctx.post(embed, Event::Banner).await?;
         }
         Some(_) => return Ok(()),
     }
@@ -84,7 +84,7 @@ async fn check_avatar(ctx: &Ctx, avatar: String) -> Result<()> {
         Some(old) if old != avatar => {
             info!("New Twitter profile picture: {avatar}");
             let embed = avatar_embed(handle, Some(&old), &avatar);
-            ctx.discord.send(embed, Event::Avatar).await?;
+            ctx.post(embed, Event::Avatar).await?;
         }
         Some(_) => return Ok(()),
     }

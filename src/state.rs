@@ -21,6 +21,9 @@ pub struct State {
     pub twitter_banner: Option<String>,
     #[serde(default)]
     pub twitter_avatar: Option<String>,
+    /// Kept so the TeamSpeak bot keeps its identity (and permissions).
+    #[serde(default)]
+    pub ts_identity: Option<tsclientlib::Identity>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

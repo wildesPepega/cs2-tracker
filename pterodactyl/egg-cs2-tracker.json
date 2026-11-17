@@ -7,7 +7,7 @@
     "exported_at": "2026-10-27T00:00:00+00:00",
     "name": "CS2 Tracker",
     "author": "wildesPepega@users.noreply.github.com",
-    "description": "Discord bot that watches Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) via Steam PICS for changelists, builds and depot changes, and posts CS2 blog posts and @CounterStrike Twitter banner and profile picture changes. Updates itself automatically.",
+    "description": "Discord bot that watches Counter-Strike 2 (730, DevClient 2275500, DevServer 2275530) via Steam PICS for changelists, builds and depot changes, and posts CS2 blog posts and @CounterStrike Twitter banner and profile picture changes. Can play a sound in a TeamSpeak 3/6 channel on game updates. Updates itself automatically.",
     "features": null,
     "docker_images": {
         "Debian": "ghcr.io/parkervcp/yolks:debian"
@@ -146,6 +146,76 @@
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|integer|min:1|max:1440",
+            "field_type": "text"
+        },
+        {
+            "name": "TeamSpeak Address (optional)",
+            "description": "TeamSpeak 3/6 server (host or host:port). Leave empty to disable the TeamSpeak bot.",
+            "env_variable": "TS_ADDRESS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "TeamSpeak Channel",
+            "description": "Channel the bot sits in. Use / for sub-channels, e.g. Gaming/CS2. Empty = default channel.",
+            "env_variable": "TS_CHANNEL",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "TeamSpeak Channel Password",
+            "description": "Password of the channel, if any.",
+            "env_variable": "TS_CHANNEL_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "TeamSpeak Server Password",
+            "description": "Server password, if any.",
+            "env_variable": "TS_SERVER_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        },
+        {
+            "name": "TeamSpeak Nickname",
+            "description": "Nickname of the bot in TeamSpeak.",
+            "env_variable": "TS_NICKNAME",
+            "default_value": "CS2 Tracker",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:30",
+            "field_type": "text"
+        },
+        {
+            "name": "TeamSpeak Events",
+            "description": "Comma-separated posts that play the sound: update, changelist, depots, news, banner, avatar. Or all / none.",
+            "env_variable": "TS_EVENTS",
+            "default_value": "update",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "TeamSpeak Sound File",
+            "description": "Own sound as Ogg Opus file in the server folder (e.g. sound.opus). Empty = bundled chime.",
+            "env_variable": "TS_SOUND_FILE",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
             "field_type": "text"
         },
         {

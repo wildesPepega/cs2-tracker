@@ -1,5 +1,6 @@
-//! Admin slash command `/preview`: replies with example embeds built from the
-//! current data, visible only to the admin who ran it.
+//! Admin slash commands: `/preview` replies with example embeds built from the
+//! current data, visible only to the admin who ran it; `/soundtest` plays the
+//! TeamSpeak sound.
 
 use crate::{
     Ctx,
@@ -26,6 +27,7 @@ use twilight_util::builder::{
 };
 
 const PREVIEW: &str = "preview";
+const SOUNDTEST: &str = "soundtest";
 
 /// Registers the global commands. Hidden from non-admins by default; server
 /// owners can change that under Server Settings → Integrations.
@@ -39,10 +41,24 @@ pub async fn register(ctx: &Ctx, app_id: Id<ApplicationMarker>) -> Result<()> {
     .contexts([InteractionContextType::Guild])
     .validate()?
     .build();
+    let mut commands = vec![preview];
+    if ctx.teamspeak.is_some() {
+        commands.push(
+            CommandBuilder::new(
+                SOUNDTEST,
+                "Play the update sound in TeamSpeak",
+                CommandType::ChatInput,
+            )
+            .default_member_permissions(Permissions::ADMINISTRATOR)
+            .contexts([InteractionContextType::Guild])
+            .validate()?
+            .build(),
+        );
+    }
     ctx.discord
         .http()
         .interaction(app_id)
-        .set_global_commands(&[preview])
+        .set_global_commands(&commands)
         .await?;
     info!("Registered slash commands");
     Ok(())
@@ -52,36 +68,61 @@ pub async fn handle(ctx: Arc<Ctx>, interaction: Interaction) {
     let Some(InteractionData::ApplicationCommand(data)) = &interaction.data else {
         return;
     };
-    if data.name != PREVIEW {
-        return;
-    }
-    if let Err(e) = preview(&ctx, &interaction).await {
-        warn!("/preview failed: {e:#}");
-    }
-}
-
-async fn preview(ctx: &Ctx, interaction: &Interaction) -> Result<()> {
-    let http = ctx.discord.http().interaction(interaction.application_id);
+    let name = data.name.clone();
     let is_admin = interaction
         .member
         .as_ref()
         .and_then(|m| m.permissions)
         .is_some_and(|p| p.contains(Permissions::ADMINISTRATOR));
-
-    if !is_admin {
-        let response = InteractionResponse {
-            kind: InteractionResponseType::ChannelMessageWithSource,
-            data: Some(
-                InteractionResponseDataBuilder::new()
-                    .content("⛔ This command is for administrators only.")
-                    .flags(MessageFlags::EPHEMERAL)
-                    .build(),
-            ),
-        };
-        http.create_response(interaction.id, &interaction.token, &response)
-            .await?;
-        return Ok(());
+    let result = if !is_admin {
+        reply(
+            &ctx,
+            &interaction,
+            "⛔ This command is for administrators only.",
+        )
+        .await
+    } else {
+        match name.as_str() {
+            PREVIEW => preview(&ctx, &interaction).await,
+            SOUNDTEST => soundtest(&ctx, &interaction).await,
+            _ => return,
+        }
+    };
+    if let Err(e) = result {
+        warn!("/{name} failed: {e:#}");
     }
+}
+
+/// Answers with an ephemeral text message.
+async fn reply(ctx: &Ctx, interaction: &Interaction, content: &str) -> Result<()> {
+    let response = InteractionResponse {
+        kind: InteractionResponseType::ChannelMessageWithSource,
+        data: Some(
+            InteractionResponseDataBuilder::new()
+                .content(content)
+                .flags(MessageFlags::EPHEMERAL)
+                .build(),
+        ),
+    };
+    ctx.discord
+        .http()
+        .interaction(interaction.application_id)
+        .create_response(interaction.id, &interaction.token, &response)
+        .await?;
+    Ok(())
+}
+
+async fn soundtest(ctx: &Ctx, interaction: &Interaction) -> Result<()> {
+    let content = match &ctx.teamspeak {
+        Some(ts) if ts.play() => "🔊 Playing the update sound in TeamSpeak.",
+        Some(_) => "⚠️ The TeamSpeak bot is busy, try again in a moment.",
+        None => "TeamSpeak is not configured (`TS_ADDRESS`).",
+    };
+    reply(ctx, interaction, content).await
+}
+
+async fn preview(ctx: &Ctx, interaction: &Interaction) -> Result<()> {
+    let http = ctx.discord.http().interaction(interaction.application_id);
 
     // Fetching the latest news can take a moment, so acknowledge first.
     let deferred = InteractionResponse {
@@ -240,6 +281,18 @@ fn status_embed(
                 match config.ping_role_id {
                     Some(role) if !config.ping_events.is_empty() => {
                         format!("<@&{role}> on {:?}", config.ping_events)
+                    }
+                    _ => "off".into(),
+                },
+            )
+            .inline(),
+        )
+        .field(
+            EmbedFieldBuilder::new(
+                "TeamSpeak",
+                match (&config.teamspeak, &ctx.teamspeak) {
+                    (Some(ts), Some(handle)) => {
+                        format!("`{}` · sound on {:?}", ts.address, handle.events())
                     }
                     _ => "off".into(),
                 },

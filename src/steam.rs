@@ -180,12 +180,11 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
     let depots = depot_changes(&old.info, &new.info);
 
     if let Some(public) = builds.iter().find(|b| b.branch == "public") {
-        ctx.discord
-            .send(
-                update_embed(appid, public, new.change_number),
-                Event::Update,
-            )
-            .await?;
+        ctx.post(
+            update_embed(appid, public, new.change_number),
+            Event::Update,
+        )
+        .await?;
     }
     let embed = changelist_embed(
         appid,
@@ -195,7 +194,7 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
         &diff,
         !depots.is_empty(),
     );
-    ctx.discord.send(embed, Event::Changelist).await?;
+    ctx.post(embed, Event::Changelist).await?;
     if !depots.is_empty() {
         let embed = depot_embed(
             app_name(appid),
@@ -204,7 +203,7 @@ async fn announce(ctx: &Ctx, appid: u32, old: &AppState, new: &AppState) -> Resu
             &depots,
             &new.info,
         );
-        ctx.discord.send(embed, Event::Depots).await?;
+        ctx.post(embed, Event::Depots).await?;
     }
     Ok(())
 }

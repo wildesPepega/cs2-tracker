@@ -16,6 +16,21 @@ pub struct Config {
     pub presence_platform: Platform,
     pub auto_update: bool,
     pub update_interval: Duration,
+    /// Set when `TS_ADDRESS` is.
+    pub teamspeak: Option<TeamSpeakConfig>,
+}
+
+pub struct TeamSpeakConfig {
+    pub address: String,
+    pub nickname: String,
+    /// Channel path like `Gaming/CS2`; `None` joins the default channel.
+    pub channel: Option<String>,
+    pub channel_password: Option<String>,
+    pub server_password: Option<String>,
+    /// Ogg Opus file; `None` plays the bundled sound.
+    pub sound_file: Option<PathBuf>,
+    /// Which posts play the sound.
+    pub events: Vec<Event>,
 }
 
 /// Kinds of posts, used to decide which ones ping the role.
@@ -56,7 +71,7 @@ impl Config {
                 .parse()
                 .context("DISCORD_CHANNEL_ID is not a valid ID")?,
             ping_role_id: number("PING_ROLE_ID")?,
-            ping_events: events(non_empty("PING_EVENTS").as_deref().unwrap_or("update,news"))?,
+            ping_events: events("PING_EVENTS", "update,news")?,
             state_file: env::var("STATE_FILE")
                 .unwrap_or_else(|_| "state.json".into())
                 .into(),
@@ -72,6 +87,19 @@ impl Config {
             update_interval: Duration::from_secs(
                 number("UPDATE_INTERVAL_MINS")?.unwrap_or(10).max(1) * 60,
             ),
+            teamspeak: non_empty("TS_ADDRESS")
+                .map(|address| -> Result<_> {
+                    Ok(TeamSpeakConfig {
+                        address,
+                        nickname: non_empty("TS_NICKNAME").unwrap_or_else(|| "CS2 Tracker".into()),
+                        channel: non_empty("TS_CHANNEL"),
+                        channel_password: non_empty("TS_CHANNEL_PASSWORD"),
+                        server_password: non_empty("TS_SERVER_PASSWORD"),
+                        sound_file: non_empty("TS_SOUND_FILE").map(PathBuf::from),
+                        events: events("TS_EVENTS", "update")?,
+                    })
+                })
+                .transpose()?,
         })
     }
 }
@@ -114,8 +142,13 @@ fn platform() -> Result<Platform> {
     )
 }
 
-/// Parses a comma-separated list like `update,news`, or `all` / `none`.
-fn events(list: &str) -> Result<Vec<Event>> {
+/// Reads a comma-separated list like `update,news`, or `all` / `none`.
+fn events(key: &str, default: &str) -> Result<Vec<Event>> {
+    parse_events(non_empty(key).as_deref().unwrap_or(default))
+        .with_context(|| format!("{key} is invalid"))
+}
+
+fn parse_events(list: &str) -> Result<Vec<Event>> {
     match list.trim().to_ascii_lowercase().as_str() {
         "all" => return Ok(EVENTS.iter().map(|&(_, e)| e).collect()),
         "none" => return Ok(Vec::new()),
@@ -130,7 +163,7 @@ fn events(list: &str) -> Result<Vec<Event>> {
                 .find(|(n, _)| *n == name)
                 .map(|&(_, e)| e)
                 .with_context(|| {
-                    format!("PING_EVENTS: unknown event {name:?}, use update, changelist, depots, news, banner, avatar, all or none")
+                    format!("unknown event {name:?}, use update, changelist, depots, news, banner, avatar, all or none")
                 })
         })
         .collect()
@@ -142,13 +175,16 @@ mod tests {
 
     #[test]
     fn parses_ping_events() {
-        assert_eq!(events("update,news").unwrap(), [Event::Update, Event::News]);
         assert_eq!(
-            events(" Banner , depots ").unwrap(),
+            parse_events("update,news").unwrap(),
+            [Event::Update, Event::News]
+        );
+        assert_eq!(
+            parse_events(" Banner , depots ").unwrap(),
             [Event::Banner, Event::Depots]
         );
-        assert_eq!(events("all").unwrap().len(), 6);
-        assert!(events("none").unwrap().is_empty());
-        assert!(events("updates").is_err());
+        assert_eq!(parse_events("all").unwrap().len(), 6);
+        assert!(parse_events("none").unwrap().is_empty());
+        assert!(parse_events("updates").is_err());
     }
 }
