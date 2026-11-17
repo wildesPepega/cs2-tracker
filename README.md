@@ -61,7 +61,7 @@ All settings are environment variables (a `.env` file is loaded automatically).
 | `UPDATE_INTERVAL_MINS` | `10` | How often to check for updates |
 | `STATE_FILE` | `state.json` | Where the state is stored |
 | `TS_ADDRESS` | – | TeamSpeak server (`host` or `host:port`). Enables the TeamSpeak bot. |
-| `TS_CHANNEL` | default channel | Channel to sit in. Use `/` for sub-channels, e.g. `Gaming/CS2` |
+| `TS_CHANNEL` | default channel | Channel to sit in: its name, or the full path (`Parent/Child`) if the name isn't unique |
 | `TS_CHANNEL_PASSWORD` | – | Password of that channel |
 | `TS_SERVER_PASSWORD` | – | Server password |
 | `TS_NICKNAME` | `CS2 Tracker` | Nickname in TeamSpeak |

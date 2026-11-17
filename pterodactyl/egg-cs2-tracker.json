@@ -160,7 +160,7 @@
         },
         {
             "name": "TeamSpeak Channel",
-            "description": "Channel the bot sits in. Use / for sub-channels, e.g. Gaming/CS2. Empty = default channel.",
+            "description": "Channel the bot sits in: its name, or the full path (Parent/Child) if the name is not unique. Empty = default channel.",
             "env_variable": "TS_CHANNEL",
             "default_value": "",
             "user_viewable": true,

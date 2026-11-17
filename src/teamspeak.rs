@@ -10,7 +10,10 @@ use tokio::{
     time::{Instant, sleep, sleep_until, timeout},
 };
 use tracing::{info, warn};
-use tsclientlib::{Connection, DisconnectOptions, Identity, StreamItem};
+use tsclientlib::{
+    ChannelId, Connection, DisconnectOptions, Identity, InMessage, OutCommandExt, StreamItem,
+    messages::c2s::{OutClientMoveMessage, OutClientMovePart},
+};
 use tsproto_packets::packets::{AudioData, CodecType, OutAudio};
 
 /// Short chime bundled with the binary, used unless `TS_SOUND_FILE` is set.
@@ -102,22 +105,16 @@ async fn session(
     let mut options = Connection::build(config.address.clone())
         .name(config.nickname.clone())
         .identity(identity(ctx).await?);
-    if let Some(channel) = &config.channel {
-        options = options.channel(channel.clone());
-    }
-    if let Some(password) = &config.channel_password {
-        options = options.channel_password(password.clone());
-    }
     if let Some(password) = &config.server_password {
         options = options.password(password.clone());
     }
     let mut con = options.connect()?;
 
-    // The first book events mean we are connected.
+    // The channel list is complete once the server says so.
     loop {
         let item = con.events().next().await;
         match item {
-            Some(Ok(StreamItem::BookEvents(_))) => break,
+            Some(Ok(StreamItem::MessageEvent(InMessage::ChannelListFinished(_)))) => break,
             Some(Ok(StreamItem::IdentityLevelIncreasing(level))) => {
                 info!("TeamSpeak: server wants identity level {level}, computing it");
             }
@@ -132,6 +129,11 @@ async fn session(
         }
     }
     *delay = Duration::from_secs(5);
+    if let Some(channel) = &config.channel
+        && let Err(e) = join_channel(&mut con, channel, config.channel_password.as_deref()).await
+    {
+        warn!("TeamSpeak: {e:#}, staying in the default channel");
+    }
     log_connected(&con);
 
     let mut queue: VecDeque<&[u8]> = VecDeque::new();
@@ -191,6 +193,71 @@ fn send(con: &mut Connection, id: &mut u16, data: &[u8]) -> Result<()> {
     *id = id.wrapping_add(1);
     con.send_audio(packet)?;
     Ok(())
+}
+
+/// Moves the bot into `wanted`, given as a full path (`Parent/Child`) or just
+/// the channel's name.
+async fn join_channel(con: &mut Connection, wanted: &str, password: Option<&str>) -> Result<()> {
+    let state = con.get_state()?;
+    let channel = find_channel(state, wanted)?;
+    let own = state.own_client;
+    if state
+        .clients
+        .get(&own)
+        .is_some_and(|c| c.channel == channel)
+    {
+        return Ok(());
+    }
+    let handle = OutClientMoveMessage::new(&mut std::iter::once(OutClientMovePart {
+        client_id: own,
+        channel_id: channel,
+        channel_password: password.map(Into::into),
+    }))
+    .send_with_result(con)?;
+
+    let result = timeout(Duration::from_secs(10), async {
+        loop {
+            match con.events().next().await {
+                Some(Ok(StreamItem::MessageResult(h, result))) if h == handle => return Ok(result),
+                Some(Ok(_)) => {}
+                Some(Err(e)) => return Err(anyhow::Error::from(e)),
+                None => bail!("disconnected"),
+            }
+        }
+    })
+    .await
+    .context("no answer to the channel move")??;
+    result.map_err(|e| anyhow::anyhow!("cannot join channel {wanted:?}: {e}"))
+}
+
+fn find_channel(state: &tsclientlib::data::Connection, wanted: &str) -> Result<ChannelId> {
+    let path = |mut id: ChannelId| {
+        let mut names = Vec::new();
+        while let Some(channel) = state.channels.get(&id) {
+            names.push(channel.name.as_str());
+            id = channel.parent;
+        }
+        names.reverse();
+        names.join("/")
+    };
+    let wanted = wanted.trim();
+    let mut by_path = state.channels.keys().filter(|&&id| path(id) == wanted);
+    if let Some(&id) = by_path.next() {
+        return Ok(id);
+    }
+    let by_name: Vec<_> = state
+        .channels
+        .values()
+        .filter(|c| c.name == wanted)
+        .collect();
+    match by_name[..] {
+        [channel] => Ok(channel.id),
+        [] => bail!("channel {wanted:?} not found"),
+        _ => bail!(
+            "{} channels are named {wanted:?}, use the full path (Parent/Child)",
+            by_name.len()
+        ),
+    }
 }
 
 fn log_connected(con: &Connection) {

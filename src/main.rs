@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,steam_vent=warn,twilight_gateway=warn".into()),
+                .unwrap_or_else(|_| "info,steam_vent=warn,twilight_gateway=warn,tsclientlib=error,tsproto=error,ts_bookkeeping=error".into()),
         )
         .init();
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();

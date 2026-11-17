@@ -23,7 +23,8 @@ pub struct Config {
 pub struct TeamSpeakConfig {
     pub address: String,
     pub nickname: String,
-    /// Channel path like `Gaming/CS2`; `None` joins the default channel.
+    /// Channel name or path like `Gaming/CS2`; `None` stays in the default
+    /// channel.
     pub channel: Option<String>,
     pub channel_password: Option<String>,
     pub server_password: Option<String>,
